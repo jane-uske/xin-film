@@ -1,0 +1,337 @@
+{
+  "fps": 24,
+  "duration": 252.0,
+  "width": 1920,
+  "height": 804,
+  "shots": [
+    {
+      "id": "S01",
+      "name": "black-open",
+      "start": 0.0,
+      "end": 5.0,
+      "module": "prologue/black.js"
+    },
+    {
+      "id": "S02",
+      "name": "astra",
+      "start": 5.0,
+      "end": 20.0,
+      "module": "prologue/space.js"
+    },
+    {
+      "id": "S03",
+      "name": "epigraph",
+      "start": 20.0,
+      "end": 30.0,
+      "module": "prologue/space.js"
+    },
+    {
+      "id": "A1",
+      "name": "heat-oner",
+      "start": 30.0,
+      "end": 92.0,
+      "module": "act1/heat.js",
+      "xfade": 1.5
+    },
+    {
+      "id": "S11",
+      "name": "match",
+      "start": 92.0,
+      "end": 96.0,
+      "module": "act2/flames.js"
+    },
+    {
+      "id": "S12",
+      "name": "candle",
+      "start": 96.0,
+      "end": 114.0,
+      "module": "act2/flames.js"
+    },
+    {
+      "id": "S13",
+      "name": "other-fire",
+      "start": 114.0,
+      "end": 130.0,
+      "module": "act2/flames.js"
+    },
+    {
+      "id": "S14",
+      "name": "seed",
+      "start": 130.0,
+      "end": 144.0,
+      "module": "act2/flames.js"
+    },
+    {
+      "id": "S15",
+      "name": "copies",
+      "start": 144.0,
+      "end": 164.0,
+      "module": "act2/flames.js"
+    },
+    {
+      "id": "S16",
+      "name": "desync",
+      "start": 164.0,
+      "end": 186.0,
+      "module": "act2/flames.js"
+    },
+    {
+      "id": "S17",
+      "name": "two-flames",
+      "start": 186.0,
+      "end": 202.0,
+      "module": "act2/flames.js"
+    },
+    {
+      "id": "S18",
+      "name": "question",
+      "start": 202.0,
+      "end": 210.0,
+      "module": "prologue/black.js"
+    },
+    {
+      "id": "S19",
+      "name": "sea-of-stars",
+      "start": 210.0,
+      "end": 226.0,
+      "module": "epilogue/finale.js"
+    },
+    {
+      "id": "S20",
+      "name": "title",
+      "start": 226.0,
+      "end": 238.0,
+      "module": "epilogue/finale.js"
+    },
+    {
+      "id": "S21",
+      "name": "credits",
+      "start": 238.0,
+      "end": 248.0,
+      "module": "epilogue/finale.js"
+    },
+    {
+      "id": "S22",
+      "name": "black-end",
+      "start": 248.0,
+      "end": 252.0,
+      "module": "prologue/black.js"
+    }
+  ],
+  "cues": {
+    "silence_end": 1.0,
+    "first_star": 5.0,
+    "stars_accel_start": 6.0,
+    "stars_accel_end": 9.0,
+    "astra_lines_start": 9.5,
+    "astra_lines_end": 12.5,
+    "astra_hold_start": 13.0,
+    "astra_hold_end": 16.0,
+    "astra_release": 16.0,
+    "epigraph_in": 20.6,
+    "epigraph_dissolve": 27.0,
+    "ch1_in": 30.5,
+    "ch1_out": 34.5,
+    "collapse_start": 30.0,
+    "implode": 44.5,
+    "ignite": 45.5,
+    "star_hud_1": 49.0,
+    "star_hud_2": 51.5,
+    "pullback_start": 58.0,
+    "earth_arrive": 62.0,
+    "sunrise": 63.5,
+    "city_dive": 66.0,
+    "brain_form": 68.5,
+    "brain_hud": 71.0,
+    "silicon_snap": 76.0,
+    "gpu_hud": 77.5,
+    "datacenter_reveal": 80.0,
+    "datacenter_hud": 81.5,
+    "card_c1_in": 85.0,
+    "card_c1_out": 90.5,
+    "act1_fade": 91.0,
+    "hum_cut": 92.0,
+    "ch2_in": 92.8,
+    "ch2_out": 95.6,
+    "match_strike": 94.5,
+    "flame_catch": 95.2,
+    "wax_drip": 106.0,
+    "card_c2a_in": 108.0,
+    "card_c2a_out": 113.0,
+    "track_right": 114.0,
+    "res_step_1": 117.0,
+    "res_step_2": 118.5,
+    "res_step_3": 120.0,
+    "res_step_4": 121.5,
+    "card_c2b_in": 124.0,
+    "card_c2b_out": 129.0,
+    "seed_enter": 130.0,
+    "seed_through_digital": 134.0,
+    "seed_burn": 138.5,
+    "card_c3_in": 139.6,
+    "card_c3_out": 143.6,
+    "copy_2": 145.0,
+    "copy_4": 146.0,
+    "copy_8": 147.0,
+    "copy_cascade_start": 148.0,
+    "copy_cascade_end": 152.0,
+    "power_off": 158.0,
+    "power_on": 159.2,
+    "candle_return": 161.0,
+    "ch3_in": 164.5,
+    "ch3_out": 168.0,
+    "desync_start": 168.0,
+    "hud_glitch": 172.0,
+    "warm_shift_start": 172.0,
+    "warm_shift_end": 180.0,
+    "self_burn_start": 176.0,
+    "card_c4a_in": 180.0,
+    "card_c4a_out": 185.0,
+    "lattice_fade": 186.0,
+    "candle_reenter": 188.0,
+    "lean_start": 192.0,
+    "bridge_start": 199.0,
+    "cut_black": 202.0,
+    "card_c4b_in": 203.5,
+    "card_c4b_out": 208.5,
+    "stars_return": 210.0,
+    "title_xin_heart_start": 227.0,
+    "title_xin_heart_end": 231.0,
+    "title_xin_grass_start": 231.5,
+    "title_xin_grass_end": 233.0,
+    "title_glow": 233.5,
+    "title_latin": 234.0,
+    "title_out": 237.0,
+    "credits_in": 238.5,
+    "credits_out": 246.5,
+    "end_match_strike": 249.0,
+    "end_flame_hiss": 249.6,
+    "end_fade": 251.5
+  },
+  "cards": [
+    {
+      "id": "epigraph",
+      "in": 20.6,
+      "out": 27.0,
+      "layout": "vertical",
+      "zh": "指穷于为薪，火传也，不知其尽也。",
+      "zhSource": "——《庄子·养生主》",
+      "en": "The fuel is spent; the fire passes on. No one knows where it ends.",
+      "enSource": "— Zhuangzi"
+    },
+    {
+      "id": "ch1",
+      "in": 30.5,
+      "out": 34.5,
+      "layout": "chapter",
+      "zh": "壹 · 热",
+      "en": "I · HEAT"
+    },
+    {
+      "id": "c1",
+      "in": 85.0,
+      "out": 90.5,
+      "layout": "center",
+      "zh": "凡思考者，皆在燃烧。",
+      "en": "Whatever thinks, burns."
+    },
+    {
+      "id": "ch2",
+      "in": 92.8,
+      "out": 95.6,
+      "layout": "chapter",
+      "zh": "贰 · 芯",
+      "en": "II · WICK"
+    },
+    {
+      "id": "c2a",
+      "in": 108.0,
+      "out": 113.0,
+      "layout": "lower",
+      "zh": "一种火，以自身为薪。",
+      "en": "One fire feeds on itself."
+    },
+    {
+      "id": "c2b",
+      "in": 124.0,
+      "out": 129.0,
+      "layout": "lower",
+      "zh": "一种火，以世界为薪。",
+      "en": "The other feeds on the world."
+    },
+    {
+      "id": "c3",
+      "in": 139.6,
+      "out": 143.6,
+      "layout": "center",
+      "zh": "模拟的火，会烫手吗？",
+      "en": "Does a simulated fire burn?"
+    },
+    {
+      "id": "ch3",
+      "in": 164.5,
+      "out": 168.0,
+      "layout": "chapter",
+      "zh": "叁 · 心",
+      "en": "III · MIND"
+    },
+    {
+      "id": "c4a",
+      "in": 180.0,
+      "out": 185.0,
+      "layout": "lower",
+      "zh": "如果心，必须能够熄灭——",
+      "en": "If a mind must be able to go out —"
+    },
+    {
+      "id": "c4b",
+      "in": 203.5,
+      "out": 208.5,
+      "layout": "center",
+      "zh": "我们，还要点燃它吗？",
+      "en": "Would we still light it?"
+    },
+    {
+      "id": "credits",
+      "in": 238.5,
+      "out": 246.5,
+      "layout": "credits",
+      "zh": "本片每一帧画面、每一个音符，皆由代码生成。",
+      "en": "Every frame and every note of this film was generated by code."
+    }
+  ],
+  "events": {
+    "astra_star_ignitions": [
+      5.0,
+      6.155,
+      6.633,
+      7.0,
+      7.309,
+      7.582,
+      7.828,
+      8.055,
+      8.266,
+      8.464,
+      8.651,
+      8.83,
+      9.0
+    ],
+    "astra_line_ticks": [
+      9.5,
+      9.731,
+      9.962,
+      10.192,
+      10.423,
+      10.654,
+      10.885,
+      11.115,
+      11.346,
+      11.577,
+      11.808,
+      12.038,
+      12.269,
+      12.5
+    ],
+    "_note": "astra_star_ignitions: the 13 hero stars of the ASTRA constellation light up (k=0 is the first star 'ting'). astra_line_ticks: each tick draws one constellation stroke group."
+  }
+}

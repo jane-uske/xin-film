@@ -1,0 +1,14 @@
+{
+  "name": "xin-film",
+  "private": true,
+  "type": "module",
+  "version": "1.0.0",
+  "description": "《芯》XIN — 全代码生成短片",
+  "dependencies": {
+    "@fontsource/cormorant-garamond": "^5.2.5",
+    "@fontsource/jetbrains-mono": "^5.2.5",
+    "@fontsource/noto-serif-sc": "^5.2.5",
+    "playwright": "^1.56.1",
+    "three": "^0.186.1"
+  }
+}
