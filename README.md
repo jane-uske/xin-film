@@ -5,8 +5,7 @@
 ## 出片
 
 ```bash
-cd film
-npm install
+npm install   # 在本目录下执行
 python3 audio/score.py                 # 配乐 -> out/score.wav（约 2–3 分钟）
 node tools/render.mjs --jobs 4         # 逐帧渲染 -> out/chunks/（无 GPU 约 1 小时，已完成的块会跳过）
 node tools/build.mjs                   # 拼接 + 2.39:1 遮幅 + 混入配乐 -> out/XIN.mp4
@@ -16,7 +15,7 @@ node tools/build.mjs                   # 拼接 + 2.39:1 遮幅 + 混入配乐 -
 
 ## 出品方署名
 
-开场星座与片尾的出品方字标默认是 `ASTRA`。在 `film/credit.local.json` 写入 `{ "word": "你的署名" }` 即可替换（该文件不进仓库；星座字体支持的字符见 `src/shots/common/astra.js`）。
+开场星座与片尾的出品方字标默认是 `ASTRA`。在本目录的 `credit.local.json` 写入 `{ "word": "你的署名" }` 即可替换（该文件不进仓库；星座字体支持的字符见 `src/shots/common/astra.js`）。
 
 ## 目录
 
@@ -30,4 +29,4 @@ node tools/build.mjs                   # 拼接 + 2.39:1 遮幅 + 混入配乐 -
 
 ## 实时预览
 
-有 GPU 的机器上：`npx serve .`，打开 `index.html?from=30`（点击开声音，空格暂停，←/→ 跳 5 秒）。
+有 GPU 的机器上，在本目录执行 `npx serve .`，打开 `index.html?from=30`（点击开声音，空格暂停，←/→ 跳 5 秒）。
