@@ -1,4 +1,4 @@
-// 贰 · 芯 / 叁 · 心（S11–S17，92.0 s → 202.0 s）
+// 贰 · 芯 / 叁 · 心（S11–S18，64.0 s → 181.0 s；S18 是切黑后的黑场，只留分类表的光标）
 // 两团火并排在虚空里。蜡烛以自身为薪：连续、温暖、会留下痕迹；镜头像人在屏息呼吸。
 // 数据之火以世界为薪：网格上的光点、冷青、精确、可复制、不留痕迹；镜头绝对平稳、匀速、对称。
 // 第三幕里，数据之火换用了蜡烛的语言。
@@ -97,7 +97,7 @@ export default async function create(ctx) {
     const c = flameCenterC(st);
     const tg = V3(0, lerp(st.wickY + 0.2, c.y - 0.75, u), 0);
     const dist = logLerp(25, 15.8, u);
-    return { tg, dist, az: lerp(-0.035, 0.0, u), el: lerp(5.0, 2.4, u) * D2R, hand: 1 };
+    return { tg, dist, az: lerp(-0.035, 0.0, u), el: lerp(5.0, 2.4, u) * D2R, hand: smoothstep(cue('flame_catch'), cue('flame_catch') + 1.5, T) };
   }
   const twoShot = (y) => ({ tg: V3(DIG.X / 2, y, 0), dist: 26, az: 0, el: 2.0 * D2R });
 
@@ -207,7 +207,8 @@ export default async function create(ctx) {
     const dir = V3(Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), -Math.cos(yaw) * Math.cos(pitch));
     return { pos, tg: pos.clone().add(dir.multiplyScalar(40)), hand: smoothstep(cue('warm_shift_start'), cue('warm_shift_end'), T) * 0.9 };
   }
-  function applyCamera(T, st) {
+  function applyCamera(T, st) { setCamera(camera, T, st); }
+  function setCamera(camera, T, st) {
     const P = camPose(T, st);
     camera.position.copy(P.pos);
     camera.up.set(0, 1, 0);
@@ -227,6 +228,20 @@ export default async function create(ctx) {
     camera.updateProjectionMatrix();
     camera.updateMatrixWorld();
   }
+
+  // 火柴划燃的位置：第一幕最后那粒火星停在画面 (0.50, 0.45) —— 硬接（match cut）。
+  // S11 里镜头在火苗立住之前是静止的，所以把这个屏幕点从那一刻的镜头反投影到蜡烛前方的一个平面上。
+  const M0 = (() => {
+    const tS = cue('match_strike');
+    const cam = new THREE.PerspectiveCamera(FOV, ctx.W / ctx.H, 0.3, 40000);
+    setCamera(cam, tS, candleState(util, cue, tS));
+    const p1 = new THREE.Vector3(0.0, 1 - 2 * 0.45, 0.2).unproject(cam);
+    const dir = p1.clone().sub(cam.position).normalize();
+    const zPlane = CANDLE.R + 0.6;
+    const k = (zPlane - cam.position.z) / dir.z;
+    const p = cam.position.clone().addScaledVector(dir, k);
+    return [p.x, p.y, p.z];
+  })();
 
   // ---------- 每帧 ----------
   const pxScale = () => ctx.H / (2 * Math.tan((camera.fov * D2R) / 2));
@@ -364,10 +379,10 @@ export default async function create(ctx) {
     // ---- 粒子 ----
     parts.begin();
     const wick = [0, st.wickY, 0];
-    const m = parts.matchAt(T, cue, wick);
+    const m = parts.matchAt(T, cue, wick, M0);
     shared.uMatchPos.value.set(m.p[0], m.p[1], m.p[2]);
     shared.uMatchI.value = m.on ? m.I * 0.9 : 0;
-    parts.sparks(T, cue, [3.0, st.wickY + 1.1, 2.8]);
+    parts.sparks(T, cue, M0);
     parts.match(m);
     parts.burn(T, cue, seedBurnPos, st, candle.waxU.uAsh.value);
     parts.curl(T, cue, seedBurnPos);
@@ -466,8 +481,6 @@ export default async function create(ctx) {
       g.exposure *= 1 - 0.1 * c; g.vignette += 0.12 * c;
     } else if (T < cue('copy_2') - 1) {
       g.temperature = 0.0;
-      const c = util.envelope(T, cue('card_c3_in') - 0.5, cue('card_c3_in') + 0.8, cue('card_c3_out') - 0.5, cue('card_c3_out') + 0.3);
-      g.exposure *= 1 - 0.1 * c;
     } else if (T < cue('candle_return')) {
       g.temperature = -0.22; g.bloomTint = [0.75, 0.92, 1.0]; g.saturation = 0.95; g.bloom = 0.95;
     } else if (T < cue('ch3_in') - 0.5) {

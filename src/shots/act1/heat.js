@@ -1,4 +1,4 @@
-// 壹 · 热 / I · HEAT — one continuous 62 s take (S04–S10):
+// 壹 · 热 / I · HEAT — one continuous 40 s take:
 // molecular cloud -> accretion disk -> ignition -> star -> Earth -> city -> brain -> chip -> datacenter.
 // Every frame is a pure function of f.T. All times come from timeline cues.
 import { buildCosmos, SUN_R } from './cosmos.js';
@@ -17,7 +17,7 @@ export default async function create(ctx) {
     start: C('collapse_start'), implode: C('implode'), ignite: C('ignite'), hud1: C('star_hud_1'), hud2: C('star_hud_2'),
     pull: C('pullback_start'), earth: C('earth_arrive'), sunrise: C('sunrise'), dive: C('city_dive'), brain: C('brain_form'),
     brainHud: C('brain_hud'), snap: C('silicon_snap'), gpuHud: C('gpu_hud'), dc: C('datacenter_reveal'), dcHud: C('datacenter_hud'),
-    cardIn: C('card_c1_in'), cardOut: C('card_c1_out'), fade: C('act1_fade'), cut: C('hum_cut'),
+    sparkRise: C('spark_rise'), fade: C('act1_fade'), sparkOut: C('spark_out'), cut: C('hum_cut'),
   };
 
   const scene = new THREE.Scene();
@@ -44,17 +44,18 @@ export default async function create(ctx) {
   }
 
   // ------------------------------------------------------------------ cosmic camera (disk / star)
-  const rotRate = (t) => (t < cue.ignite ? 0.35 + 1.5 * Math.pow(smoothstep(cue.start + 1, cue.implode, t), 2) : 0.06);
+  const windK = clamp(14.5 / (cue.implode - cue.start), 1, 1.35);
+  const rotRate = (t) => (t < cue.ignite ? (0.35 + 1.5 * Math.pow(smoothstep(cue.start + 1, cue.implode, t), 2)) * windK : 0.06);
   function diskCam(T) {
     const az = -0.55 + 0.024 * (T - cue.start) + 0.06 * smoothstep(cue.start, cue.ignite, T);
     let d = lerp(62, 37, ease.inOutSine(invLerp(cue.start, cue.implode, T)));
     d = lerp(d, 34, ease.inOutSine(invLerp(cue.implode, cue.ignite, T)));
     d = lerp(d, 30.5, ease.outCubic(invLerp(cue.ignite, cue.pull, T)));
-    const el = lerp(0.27, 0.22, smoothstep(cue.start, cue.implode, T)) - 0.14 * ease.inOutSine(invLerp(cue.ignite, cue.ignite + 5, T));
+    const el = lerp(0.27, 0.22, smoothstep(cue.start, cue.implode, T)) - 0.14 * ease.inOutSine(invLerp(cue.ignite, cue.ignite + 3.5, T));
     const p = [Math.cos(az) * Math.cos(el) * d, Math.sin(el) * d, Math.sin(az) * Math.cos(el) * d];
     // camera-right vector in the disk plane, used to push the star right of frame centre
     const right = [-Math.sin(az), 0, Math.cos(az)];
-    const off = 3.4 * ease.inOutSine(invLerp(cue.ignite + 0.5, cue.ignite + 4, T)) + 0.6 * smoothstep(cue.ignite + 4, cue.pull, T);
+    const off = 3.4 * ease.inOutSine(invLerp(cue.ignite + 0.4, cue.ignite + 2.8, T)) + 0.6 * smoothstep(cue.ignite + 2.8, cue.pull, T);
     const lift = -1.2 * (1 - smoothstep(cue.start, cue.implode, T));
     let l = [right[0] * off, lift, right[2] * off];
     // implosion tremor
@@ -190,7 +191,7 @@ export default async function create(ctx) {
   const DIVE_END = { p: [0.0, 1.3, 1.05], l: [0, 0.0, -0.08], u: [0, 1, 0], fov: 30 };
   const BRAIN_A = orbit(0.30, 0.26, 3.2);
   const brainOrbit = (T) => {
-    const k = ease.inOutSine(invLerp(cue.brainHud - 0.5, cue.snap, T));
+    const k = ease.inOutSine(invLerp(cue.brainHud + 0.3, cue.snap, T));
     return orbit(lerp(0.30, 0.62, k), lerp(0.26, 0.34, k), lerp(3.2, 2.95, k));
   };
   function localCam(T) {
@@ -207,9 +208,9 @@ export default async function create(ctx) {
       const look = norm3(lerp3(l0d, tgtDir, ease.inOutSine(clamp(u / 0.7))));
       return { p, l: add3(p, look), u: norm3(lerp3(u0, [0, 1, 0], ease.inOutSine(u))), fov: 30, near: Math.max(0.02, len3(p) * 0.01), far: 30000 };
     }
-    if (T < cue.brainHud - 0.5) {
-      const k = ease.inOutSine(invLerp(cue.brain - 0.2, cue.brainHud - 0.6, T));
-      const k2 = ease.inOutSine(invLerp(cue.brain - 0.2, cue.brainHud - 0.6, T));
+    if (T < cue.brainHud + 0.3) {
+      const k = ease.inOutSine(invLerp(cue.brain - 0.2, cue.brainHud + 0.3, T));
+      const k2 = ease.inOutSine(invLerp(cue.brain - 0.2, cue.brainHud + 0.3, T));
       return { p: lerp3(DIVE_END.p, BRAIN_A.p, k2), l: lerp3(DIVE_END.l, BRAIN_A.l, k), u: [0, 1, 0], fov: 30 };
     }
     if (T < cue.snap) return brainOrbit(T);
@@ -235,13 +236,13 @@ export default async function create(ctx) {
   const mmToL = (v) => [v[0] * MM, DIE_Y + v[1] * MM, v[2] * MM];
   const BCX = (L.BLD.x0 + L.BLD.x1) / 2, BCZ = (L.BLD.z0 + L.BLD.z1) / 2;
   const HALLC = [L.hall0[0] + L.HALLX / 2, -200, L.hall0[2] + L.HALLZ / 2];
-  const T_PO = cue.gpuHud + 0.5; // pull-out start (the cold chip holds for a beat under the HUD)
+  const T_PO = cue.gpuHud + 0.7; // pull-out start (the cold chip holds for a beat under its label)
   const chipOrbitMM = (az, el, D) => [D * Math.cos(el) * Math.sin(az), D * Math.sin(el), D * Math.cos(el) * Math.cos(az)];
   function pullOutMM(T) {
-    const e = ease.inOutSine(invLerp(T_PO, cue.dcHud + 1.0, T));
+    const e = ease.inOutSine(invLerp(T_PO, T_PO + 2.4, T));
     const D = Math.exp(lerp(Math.log(2.3 / MM), Math.log(60000), e));
     const az = lerp(1.32, 1.62, e), el = lerp(0.98, 1.22, smoothstep(T_PO, cue.dc, T));
-    const tgt = lerp3([0, 0, 0], HALLC, smoothstep(T_PO + 1.7, cue.dc + 1.4, T));
+    const tgt = lerp3([0, 0, 0], HALLC, smoothstep(T_PO + 0.6, T_PO + 1.6, T));
     return { p: add3(tgt, chipOrbitMM(az, el, D)), l: tgt };
   }
   // the hall: elevated, over the hot aisle next to our rack, looking down the rows into warm haze
@@ -250,7 +251,7 @@ export default async function create(ctx) {
     const d = Math.max(0, T - cue.dc) * 700;
     return { p: [L.rack0[0] - 5200 + d, 2300 + 250 * Math.max(0, T - cue.dc), HZ - 1700], l: [L.rack0[0] + 16000 + d, -1900, HZ + 2300] };
   }
-  const T_CR = cue.dc + 0.6;
+  const T_CR = cue.dc + 0.4;
   const H0 = hallMM(T_CR);
   const CR = [
     H0.p,
@@ -274,11 +275,11 @@ export default async function create(ctx) {
   function dcCamLocal(T) {
     const a = pullOutMM(T);
     const h = hallMM(T);
-    const wH = ease.inOutSine(invLerp(T_PO + 0.9, cue.dc + 0.35, T));
+    const wH = ease.inOutSine(invLerp(T_PO + 0.45, T_PO + 1.25, T));
     let p = lerp3(a.p, h.p, wH), l = lerp3(a.l, h.l, wH);
     if (T > T_CR) {
       const c = craneMM(T);
-      const wC = ease.inOutSine(invLerp(T_CR, T_CR + 1.8, T));
+      const wC = ease.inOutSine(invLerp(T_CR, T_CR + 1.7, T));
       p = lerp3(p, c.p, wC); l = lerp3(l, c.l, wC);
     }
     const D = Math.min(len3(sub3(p, l)), Math.max(200, p[1] - L.FLOOR)) * MM;
@@ -342,17 +343,18 @@ export default async function create(ctx) {
     U.uShock.value = sinceIg >= 0 ? sinceIg : -1;
     U.uHeat.value = smoothstep(cue.start + 2, cue.implode, T);
     // overall visibility: dim in the opening, debris fades through the star shot and pull-back
-    U.uFade.value = lerp(0.6, 1, smoothstep(cue.start, cue.start + 6, T)) * (1 - 0.8 * smoothstep(cue.ignite + 1, cue.ignite + 6, T)) * (1 - smoothstep(cue.pull + 1, cue.pull + 2.8, T));
+    U.uFade.value = lerp(0.6, 1, smoothstep(cue.start, cue.start + 4, T)) * (1 - 0.8 * smoothstep(cue.ignite + 1, cue.ignite + 4.5, T)) * (1 - smoothstep(cue.pull + 0.8, cue.pull + 2.2, T));
     U.uDebris.value = 1;
-    const cloudOn = T < cue.pull + 3;
+    const cloudOn = T < cue.pull + 2.4;
     const wD = smoothstep(cue.ignite + 1.2, cue.ignite + 1.9, T);
     cos.cloud.visible = cloudOn && wD < 1;
     debris.visible = cloudOn && wD > 0;
     U.uGain.value = 1 - wD;
     debrisU.uGain.value = 3 * wD;
     cos.haze.visible = cloudOn;
-    cos.embers.visible = T < cue.start + 13;
+    cos.embers.visible = T < cue.start + 9;
     cos.emberU.uEm.value = 1;
+    cos.emberU.uStart.value = cue.start;
     {
       const c0 = diskCam(cue.start);
       const p0 = new THREE.Vector3(...c0.p), f0 = new THREE.Vector3(...c0.l).sub(p0).normalize();
@@ -407,11 +409,11 @@ export default async function create(ctx) {
     cos.prom.visible = T > cue.ignite + 1;
     cos.promU.uT.value = T;
     cos.promU.uH.value = 0.12 + 0.4 * ease.inOutSine(invLerp(cue.ignite + 1, cue.pull, T));
-    cos.promU.uI.value = smoothstep(cue.ignite + 1.5, cue.ignite + 5, T);
+    cos.promU.uI.value = smoothstep(cue.ignite + 1.0, cue.ignite + 3.5, T);
     cos.stars.position.copy(cam.position);
-    cos.prom.visible = cos.prom.visible && T < cue.pull + 2.5;
+    cos.prom.visible = cos.prom.visible && T < cue.pull + 2.0;
     // Earth beat
-    const earthOn = T > cue.pull + 1.0;
+    const earthOn = T > cue.pull + 0.7;
     earth.group.visible = earthOn;
     earth.burst.visible = false;
     if (earthOn) {
@@ -433,14 +435,14 @@ export default async function create(ctx) {
       earth.group.visible = T < cue.brain + 1.6;
     }
     // network (city -> brain -> chip)
-    const netOn = T > cue.pull + 1.0;
+    const netOn = T > cue.pull + 0.7;
     const wF = 1 - smoothstep(cue.dive + 0.9, cue.dive + 1.6, T);
     net.points.visible = netOn && wF < 1;
     netFar.visible = netOn && wF > 0;
     if (netOn) {
       const U = net.U;
       U.uT.value = T;
-      U.uCB.value = ease.inOutSine(invLerp(cue.brain, cue.brainHud, T));
+      U.uCB.value = ease.inOutSine(invLerp(cue.brain, cue.brainHud + 0.6, T));
       U.uBC.value = invLerp(cue.snap, cue.snap + 0.6, T);
       U.uPulse.value = smoothstep(cue.brain - 0.3, cue.brain + 0.8, T);
       U.uTurb.value = 0;
@@ -486,8 +488,8 @@ export default async function create(ctx) {
       g.vignette = 0.45;
     } else {
       const k = Math.exp(-sinceIg * 1.3);
-      g.streak = 1.3 * Math.exp(-sinceIg * 1.8) + 0.08 * smoothstep(1.5, 4, sinceIg) * (1 - smoothstep(4, 12, sinceIg)) * 0;
-      g.exposure = 1.0 + 0.8 * Math.exp(-sinceIg * 18);
+      g.streak = 1.0 * Math.exp(-sinceIg * 2.0) + 0.08 * smoothstep(1.5, 4, sinceIg) * (1 - smoothstep(4, 12, sinceIg)) * 0;
+      g.exposure = 1.0 + 0.6 * Math.exp(-sinceIg * 18);
       g.bloom = 0.65 + 0.6 * k;
       g.temperature = 0.22;
       g.saturation = 1.12;
@@ -497,7 +499,7 @@ export default async function create(ctx) {
   }
 
   const thermalOn = (T) => T >= T_PO - 0.1;
-  const scanAt = (T) => ease.inOutSine(invLerp(T_PO, T_PO + 0.7, T));
+  const scanAt = (T) => ease.inOutSine(invLerp(T_PO, T_PO + 0.6, T));
   function updateThermal(T) {
     dc.U.uT.value = T;
     dc.plU.uT.value = T;
@@ -505,11 +507,49 @@ export default async function create(ctx) {
     dc.passU.uScan.value = scanAt(T);
     dc.passU.uExp.value = 1.0;
     netHeatU.uHeat.value = 1.0;
-    netHeatU.uGain.value = 0.03 * (1 - smoothstep(T_PO + 1.2, T_PO + 2.4, T));
+    netHeatU.uGain.value = 0.03 * (1 - smoothstep(T_PO + 0.6, T_PO + 1.3, T));
     netHeat.visible = netHeatU.uGain.value > 0.001;
-    dc.plU.uI.value = smoothstep(cue.dc + 1.0, cue.dc + 2.4, T);
-    dc.U.uFog.value = lerp(1 / (22000 * MM), 1 / (900000 * MM), smoothstep(cue.dc + 0.7, cue.dc + 1.9, T)) * smoothstep(T_PO + 0.8, T_PO + 1.6, T);
+    dc.plU.uI.value = smoothstep(T_CR + 0.4, T_CR + 1.4, T) * (1 - ease.inOutSine(invLerp(cue.sparkRise, cue.fade + 0.3, T)));
+    dc.U.uFog.value = lerp(1 / (22000 * MM), 1 / (900000 * MM), smoothstep(T_CR + 0.2, T_CR + 1.2, T)) * smoothstep(T_PO + 0.3, T_PO + 0.9, T);
   }
+
+  // ------------------------------------------------------------------ ending: one spark
+  // From spark_rise one ember leaves the heat column; from act1_fade everything else goes to black;
+  // the ember settles at screen (0.50, 0.45 from top) by spark_out — Act II strikes its match there.
+  const camTmp = new THREE.PerspectiveCamera(30, ctx.W / ctx.H, 0.1, 30000);
+  const sparkFrom = (() => {
+    const c = cosmicCam(cue.sparkRise);
+    camTmp.position.set(...c.p); camTmp.up.set(...c.u); camTmp.lookAt(...c.l);
+    camTmp.fov = c.fov; camTmp.near = c.near || 0.1; camTmp.far = c.far || 30000;
+    camTmp.updateProjectionMatrix(); camTmp.updateMatrixWorld();
+    const v = new THREE.Vector3(...toW(mmToL([L.PLX + 3000, L.FLOOR + 52000, L.PLZ]))).project(camTmp);
+    return [clamp(v.x * 0.5 + 0.5, 0.55, 0.92), clamp(v.y * 0.5 + 0.5, 0.25, 0.7)]; // uv, y up
+  })();
+  const SPARK_END = [0.5, 1 - 0.45];
+  function sparkAt(T) {
+    const u = invLerp(cue.sparkRise, cue.sparkOut, T);
+    const e = 1 - Math.pow(1 - u, 2.4);                       // rises, decelerates, comes to rest
+    const ctrl = [lerp(sparkFrom[0], SPARK_END[0], 0.25), Math.max(sparkFrom[1], SPARK_END[1]) + 0.1];
+    const bx = (1 - e) * (1 - e) * sparkFrom[0] + 2 * (1 - e) * e * ctrl[0] + e * e * SPARK_END[0];
+    const by = (1 - e) * (1 - e) * sparkFrom[1] + 2 * (1 - e) * e * ctrl[1] + e * e * SPARK_END[1];
+    const wob = (1 - e) * 0.012;
+    return [bx + util.noise1(T * 1.7 + 3) * wob, by + util.noise1(T * 1.3 + 9) * wob * 0.6];
+  }
+  const fadeMat = ctx.passMaterial(/* glsl */ `
+    precision highp float; in vec2 vUv; out vec4 o; uniform float uK;
+    void main(){ o = vec4(0.0, 0.0, 0.0, 1.0 - uK); }`, { uK: { value: 1 } }, { blending: THREE.NormalBlending, transparent: true });
+  const sparkMat = ctx.passMaterial(/* glsl */ `
+    precision highp float; in vec2 vUv; out vec4 o;
+    uniform vec2 uPos; uniform float uI, uAsp, uR, uFl;
+    void main(){
+      vec2 d = (vUv - uPos) * vec2(uAsp, 1.0);
+      float r = length(d) / uR;
+      float core = exp(-r * r * 2.2);
+      float halo = exp(-r * 0.9) * 0.05 + exp(-r * r * 0.12) * 0.06;
+      vec3 c = vec3(1.0, 0.86, 0.62) * core * 9.0 + vec3(1.0, 0.42, 0.12) * (halo * 6.0 + core * 2.0);
+      o = vec4(c * uI * uFl, 1.0);
+    }`, { uPos: { value: new THREE.Vector2() }, uI: { value: 0 }, uAsp: { value: ctx.W / ctx.H }, uR: { value: 0.0045 }, uFl: { value: 1 } },
+    { blending: THREE.AdditiveBlending, transparent: true });
 
   // ------------------------------------------------------------------ main
   return {
@@ -541,9 +581,21 @@ export default async function create(ctx) {
         r.render(heatScene, cam);
         r.autoClear = false; ctx.fsq.render(r, dc.pass, f.target); r.autoClear = true;
       }
+      // ending: everything but the spark goes to black from act1_fade
+      if (T >= cue.fade) {
+        fadeMat.uniforms.uK.value = 1 - ease.inOutSine(invLerp(cue.fade, cue.fade + 0.85, T));
+        r.autoClear = false; ctx.fsq.render(r, fadeMat, f.target); r.autoClear = true;
+      }
+      if (T >= cue.sparkRise) {
+        const [sx, sy] = sparkAt(T);
+        const su = sparkMat.uniforms;
+        su.uPos.value.set(sx, sy);
+        su.uI.value = smoothstep(cue.sparkRise, cue.sparkRise + 0.35, T);
+        su.uFl.value = 0.85 + 0.15 * util.noise1(T * 9.0) + 0.08 * Math.sin(T * 23.0);
+        r.autoClear = false; ctx.fsq.render(r, sparkMat, f.target); r.autoClear = true;
+      }
       const gr = gradeCosmos(T);
-      // fade to black: fully black by hum_cut - 1 frame
-      gr.fade = 1 - ease.inOutSine(invLerp(cue.fade, cue.cut - 0.08, T));
+      if (T >= cue.sparkRise) { gr.bloom = 0.55; gr.bloomThreshold = 1.0; gr.bloomRadius = 1.0; gr.streak = 0; }
       return gr;
     },
     overlay(g, f) {
@@ -551,44 +603,31 @@ export default async function create(ctx) {
       const proj = (v) => ctx.project(new THREE.Vector3(v[0], v[1], v[2]), cam);
       const camR = new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld, 0);
       const camU = new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld, 1);
-      // S06 star: SURFACE / BURNS
+      const F = LABELS.fields;
+      // the classification table, 1/3: the sun
       if (T > cue.hud1 && T < cue.pull + 0.2) {
-        const a = 1 - smoothstep(cue.pull - 1.6, cue.pull - 0.4, T);
-        const R = SUN_R;
-        const w = camR.clone().multiplyScalar(-0.62 * R).add(camU.clone().multiplyScalar(0.3 * R));
+        const a = 1 - smoothstep(cue.pull - 0.9, cue.pull - 0.15, T);
+        const w = camR.clone().multiplyScalar(-0.66 * SUN_R).add(camU.clone().multiplyScalar(0.34 * SUN_R));
         const [x, y] = proj([w.x, w.y, w.z]);
-        const dir = [-1, -0.62], len = 170;
-        const at2 = cue.hud2 - cue.hud1;
-        overlay.hudCallout(g, { anchor: [x, y], dir, len, t: T - cue.hud1, alpha: a, S, lines: [
-          { text: LABELS.star.temp }, { text: LABELS.star.tempEn, en: true },
-          { text: LABELS.star.burn, at: at2 }, { text: LABELS.star.burnEn, en: true, at: at2 + 0.3 },
-        ] });
+        overlay.hudClassify(g, { ...LABELS.sun, fields: F, anchor: [x, y], dir: [-1, -0.55], len: 150, t: T - cue.hud1, alpha: a, S, charRate: 55 });
       }
-      // S07 Earth
-      const tE = cue.earth + 0.9;
-      if (T > tE && T < cue.dive + 0.3) {
-        const a = 1 - smoothstep(cue.dive - 0.6, cue.dive + 0.2, T);
-        const w = new THREE.Vector3(...E).add(camR.clone().multiplyScalar(-EARTH_R * 0.96)).add(camU.clone().multiplyScalar(-EARTH_R * 0.25));
-        const [x, y] = proj([w.x, w.y, w.z]);
-        overlay.hudCallout(g, { anchor: [x, y], dir: [-1, 0.42], len: 120, lines: [{ text: LABELS.earth.name }, { text: LABELS.earth.en, en: true }], t: T - tE, alpha: a, S });
+      // 2/3: the human brain (held into the snap so it can be read)
+      if (T > cue.brainHud && T < cue.snap + 0.8) {
+        const a = 1 - smoothstep(cue.snap + 0.25, cue.snap + 0.7, T);
+        const [x, y] = proj(toW([0.3, 1.18, 0.4]));
+        overlay.hudClassify(g, { ...LABELS.brain, fields: F, anchor: [x, y], dir: [1, -0.62], len: 130, t: T - cue.brainHud, alpha: a, S, charRate: 120 });
       }
-      // S08 brain
-      if (T > cue.brainHud && T < cue.snap) {
-        const a = 1 - smoothstep(cue.snap - 0.9, cue.snap - 0.2, T);
-        const [x, y] = proj(toW([0.36, 1.2, 0.42]));
-        overlay.hudCallout(g, { anchor: [x, y], dir: [1, -0.5], len: 150, lines: [{ text: LABELS.brain.name }, { text: LABELS.brain.fact }, { text: LABELS.brain.en, en: true }], t: T - cue.brainHud, alpha: a, S });
-      }
-      // S09 GPU
-      if (T > cue.gpuHud && T < T_PO + 1.6) {
-        const a = 1 - smoothstep(T_PO + 0.6, T_PO + 1.4, T);
+      // the chip — the same AI chip becomes the wick of the digital flame in Act II
+      if (T > cue.gpuHud && T < cue.dcHud) {
+        const a = 1 - smoothstep(cue.dcHud - 0.55, cue.dcHud - 0.1, T);
         const [x, y] = proj(toW([0.0, DIE_Y, 0.0]));
-        overlay.hudCallout(g, { anchor: [x, y], dir: [1, -0.48], len: 170, lines: [{ text: LABELS.gpu.name }, { text: LABELS.gpu.en, en: true }], t: T - cue.gpuHud, alpha: a, S });
+        overlay.hudCallout(g, { anchor: [x, y], dir: [1, -0.5], len: 150, lines: [{ text: LABELS.gpu.name }, { text: LABELS.gpu.en, en: true }], t: T - cue.gpuHud, alpha: a, S, charRate: 60 });
       }
-      // S09 datacenter
-      if (T > cue.dcHud && T < cue.cardIn) {
-        const a = 1 - smoothstep(cue.cardIn - 1.2, cue.cardIn - 0.3, T);
-        const [x, y] = proj(toW(mmToL([BCX - 12000, L.FLOOR + 7000, BCZ])));
-        overlay.hudCallout(g, { anchor: [x, y], dir: [-1, -0.55], len: 150, lines: [{ text: LABELS.datacenter.name }, { text: LABELS.datacenter.fact }, { text: LABELS.datacenter.en, en: true }], t: T - cue.dcHud, alpha: a, S });
+      // 3/3: the datacenter
+      if (T > cue.dcHud && T < cue.fade + 0.1) {
+        const a = 1 - smoothstep(cue.fade - 0.5, cue.fade, T);
+        const [x, y] = proj(toW(mmToL([BCX - 14000, L.FLOOR + 7000, BCZ])));
+        overlay.hudClassify(g, { ...LABELS.datacenter, fields: F, anchor: [x, y], dir: [-1, -0.6], len: 130, t: T - cue.dcHud, alpha: a, S, charRate: 90 });
       }
     },
   };

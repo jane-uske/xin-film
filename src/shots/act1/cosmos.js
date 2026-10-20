@@ -264,19 +264,19 @@ export function buildCosmos(ctx, scene) {
   emberGeo.setAttribute('aCyl', new THREE.BufferAttribute(eCyl, 3));
   emberGeo.setAttribute('aDisk', new THREE.BufferAttribute(eDisk, 3));
   emberGeo.setAttribute('aRnd', new THREE.BufferAttribute(eRnd, 4));
-  const emberU = Object.assign({}, cloudU, { uSize: { value: 1 }, uGain: { value: 1 }, uCamR: { value: new THREE.Vector3(1, 0, 0) }, uCamF: { value: new THREE.Vector3(0, 0, -1) }, uCam0: { value: new THREE.Vector3() }, uEm: { value: 1 } });
+  const emberU = Object.assign({}, cloudU, { uSize: { value: 1 }, uGain: { value: 1 }, uCamR: { value: new THREE.Vector3(1, 0, 0) }, uCamF: { value: new THREE.Vector3(0, 0, -1) }, uCam0: { value: new THREE.Vector3() }, uEm: { value: 1 }, uStart: { value: 24 } });
   const emberMat = new THREE.ShaderMaterial({
     uniforms: emberU,
     vertexShader: /* glsl */ `
       attribute vec4 aE; attribute vec3 aCyl; attribute vec3 aDisk; attribute vec4 aRnd;
-      uniform vec3 uCamR, uCamF, uCam0; uniform float uEm;
+      uniform vec3 uCamR, uCamF, uCam0; uniform float uEm, uStart;
       ${POINT_VS}
       ${CLOUD_FN}
       varying vec3 vCol;
       void main(){
         vec3 col; float vis;
         vec3 target = cloudPos(aCyl, aDisk, aRnd, col, vis);
-        float t = uT - 30.0;
+        float t = uT - uStart;
         // free rise in front of the opening camera
         float depth = mix(16.0, 46.0, aE.z);
         vec3 up = vec3(0.0, 1.0, 0.0);
@@ -285,8 +285,8 @@ export function buildCosmos(ctx, scene) {
         vec3 q = vec3(aE.x * 3.0, aE.y * 3.0 + t * 0.12, aE.w * 5.0);
         s += up * rise + vec3(snoise(q), 0.3 * snoise(q + 11.0), snoise(q + 23.0)) * 2.2;
         // drawn into the cloud
-        float t0 = 31.0 + 5.5 * aE.w * aE.w + 1.5 * aE.z;
-        float k = smoothstep(t0, t0 + 5.0, uT);
+        float t0 = uStart + 0.8 + 3.4 * aE.w * aE.w + 1.0 * aE.z;
+        float k = smoothstep(t0, t0 + 3.6, uT);
         k = k * k * (3.0 - 2.0 * k);
         vec3 p = mix(s, target, k);
         vec4 mv = modelViewMatrix * vec4(p, 1.0);

@@ -96,7 +96,9 @@ export function drawCard(g, card, T, W, H, S) {
 
 // ---------- HUD ----------
 // 机器的目光：细线引出标注，打字机式出现。t 为该标注出现后的本地时间，alpha 为整体透明度。
-export function hudCallout(g, { anchor, dir = [1, -0.6], len = 120, lines = [], t = 0, alpha = 1, S = 1, color = COLORS.hud, align = 'auto', charRate = 38 }) {
+// ln.cursor = 'blink'：该行打完后保留一个闪烁的光标（等待输入）。
+// cursorOnly：只画各行的闪烁光标，不画框线与文字（高潮切黑后，光标独自留在黑暗里）。
+export function hudCallout(g, { anchor, dir = [1, -0.6], len = 120, lines = [], t = 0, alpha = 1, S = 1, color = COLORS.hud, align = 'auto', charRate = 38, cursorOnly = false, blinkT = t }) {
   if (t <= 0 || alpha <= 0) return;
   const [ax, ay] = anchor;
   const dl = Math.hypot(dir[0], dir[1]);
@@ -109,12 +111,14 @@ export function hudCallout(g, { anchor, dir = [1, -0.6], len = 120, lines = [], 
   g.strokeStyle = rgba(color, alpha * 0.75);
   g.fillStyle = rgba(color, alpha * 0.9);
   g.lineWidth = Math.max(1, 1 * S);
-  // 锚点：小方框 + 中心点
-  const box = 7 * S * ease.outCubic(clamp(t / 0.3));
-  g.strokeRect(ax - box / 2, ay - box / 2, box, box);
-  g.fillRect(ax - 1 * S, ay - 1 * S, 2 * S, 2 * S);
-  g.beginPath(); g.moveTo(ax + ux * box * 0.7, ay + uy * box * 0.7); g.lineTo(ex, ey);
-  g.lineTo(ex + (right ? shelf : -shelf), ey); g.stroke();
+  if (!cursorOnly) {
+    // 锚点：小方框 + 中心点
+    const box = 7 * S * ease.outCubic(clamp(t / 0.3));
+    g.strokeRect(ax - box / 2, ay - box / 2, box, box);
+    g.fillRect(ax - 1 * S, ay - 1 * S, 2 * S, 2 * S);
+    g.beginPath(); g.moveTo(ax + ux * box * 0.7, ay + uy * box * 0.7); g.lineTo(ex, ey);
+    g.lineTo(ex + (right ? shelf : -shelf), ey); g.stroke();
+  }
   // 文本
   const tx = ex + (right ? 8 * S : -8 * S), ty = ey - 9 * S * TYPE.hud;
   g.textAlign = right ? 'left' : 'right';
@@ -135,11 +139,32 @@ export function hudCallout(g, { anchor, dir = [1, -0.6], len = 120, lines = [], 
     g.letterSpacing = `${(ln.spacing ?? (ln.en ? 0.2 : 0.12)) * size}px`;
     g.fillStyle = rgba(ln.color || color, alpha * (ln.alpha ?? (ln.en ? 0.45 : i === 0 ? 0.95 : 0.75)));
     let txt = ln.text.slice(0, n);
-    // 打字光标
-    if (n < ln.text.length) txt += '▍';
+    const typed = n >= ln.text.length;
+    const blinkOn = (blinkT % 1.0) < 0.55;
+    // 打字光标；cursor:'blink' 的行打完后光标继续闪
+    const showCursor = !typed || (ln.cursor === 'blink' && blinkOn);
+    if (cursorOnly) {
+      if (ln.cursor !== 'blink' || !showCursor) return;
+      if (right) g.fillText('▍', tx + g.measureText(ln.text).width, yy);
+      else { g.textAlign = 'right'; g.fillText('▍', tx, yy); g.textAlign = 'right'; }
+      return;
+    }
+    if (showCursor) txt += '▍';
     g.fillText(txt, tx, yy);
   });
   g.restore();
+}
+
+// 分类表标注：全片统一的两栏模板（名称 / 思考 / 会失去自己 / 英文小字）。
+// lose 为空字符串时，第二栏留空并保留闪烁光标。
+export function hudClassify(g, { name, think, lose, en, fields, ...opts }) {
+  const lines = [
+    { text: name },
+    { text: `${fields.think}：${think}` },
+    { text: `${fields.lose}：${lose}`, cursor: lose ? undefined : 'blink' },
+  ];
+  if (en) lines.push({ text: en, en: true });
+  hudCallout(g, { ...opts, lines });
 }
 
 // 四角取景框

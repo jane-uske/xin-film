@@ -1,11 +1,12 @@
-// 序幕 S02「群星 / 出品方星座」+ S03「薪火（题记）」：同一片星空、同一条摄影机路径，换镜头不换世界。
+// 序幕 S02「群星 / 出品方星座」+ S03「漂流」：同一片星空、同一条摄影机路径，换镜头不换世界。
 //   5.0–9.0   星点依次点亮（13 颗主星按 events.astra_star_ignitions 闪亮）
 //   9.5–12.5  发丝细线把星连成出品方字标（events.astra_line_ticks；文字见 timeline.credit.word）
 //   16–20     连线收回，摄影机加速穿过星座，再减速成缓慢漂移
-//   20.6–27   竖排题记逐字被"点亮"；27 起逐字燃成余烬向上飘散
+//   20–24     减速漂流，零星余烬从下方升起，交叉淡入第一幕（第二版：庄子题记移到尾声）
 import * as THREE from 'three';
 import { createStarfield } from '../common/starfield.js';
 import { all as GLSL } from '../../engine/glsl.js';
+import { makeEpigraph } from '../common/epigraph.js';
 import { layoutWord } from '../common/astra.js';
 
 // ---- 出品方星座 ----
@@ -24,11 +25,6 @@ function camZ(T) {
   const d = B1 - B0;
   return zb - V0 * d - VP * d * 0.5 - V0 * (T - B1);
 }
-
-// ---- 题记竖排 ----
-const COLS = ['指穷于为薪，火传也，', '不知其尽也。'];
-const SOURCE = '  ︽庄子·养生主︾';
-const PUNCT = new Set(['，', '。']);
 
 export default async function create(ctx) {
   const { util, overlay } = ctx;
@@ -162,74 +158,8 @@ export default async function create(ctx) {
   const camera = new THREE.PerspectiveCamera(30, W / H, 0.05, 6000);
   scene.add(camera);
 
-  // ---- 余烬：挂在摄影机下（摄影机坐标系），环境余烬 + 文字燃烧生成的余烬 ----
-  const tanH = Math.tan(THREE.MathUtils.degToRad(15));
-  const D = 10; // 余烬所在深度
-  const screenToCam = (x, y, d = D) => [((x / W) * 2 - 1) * d * tanH * (W / H), (1 - (y / H) * 2) * d * tanH, -d];
-
-  const glyphs = layoutEpigraph(W, H, S);
-  const emberSrc = sampleGlyphs(glyphs, W, H, S);
-  const amb = 340, ne = amb + emberSrc.length;
-  const ePos = new Float32Array(ne * 3), eBirth = new Float32Array(ne), eSeed = new Float32Array(ne * 3), eHeat = new Float32Array(ne);
-  const er = util.rng(5150);
-  for (let i = 0; i < amb; i++) {
-    // 环境余烬：从画面下方升起，循环出现（闭式）
-    const p = screenToCam(er() * W, H * (1.05 + er() * 0.1), D * (0.6 + er() * 1.8));
-    ePos.set(p, i * 3);
-    eBirth[i] = 19.0 + er() * 13.0;
-    eSeed.set([er(), er(), er()], i * 3);
-    eHeat[i] = 0.35 + er() * 0.5;
-  }
-  emberSrc.forEach((e, k) => {
-    const i = amb + k;
-    ePos.set(screenToCam(e.x, e.y), i * 3);
-    eBirth[i] = e.t;
-    eSeed.set([er(), er(), er()], i * 3);
-    eHeat[i] = 1.0;
-  });
-  const eg = new THREE.BufferGeometry();
-  eg.setAttribute('position', new THREE.BufferAttribute(ePos, 3));
-  eg.setAttribute('aBirth', new THREE.BufferAttribute(eBirth, 1));
-  eg.setAttribute('aSeed', new THREE.BufferAttribute(eSeed, 3));
-  eg.setAttribute('aHeat', new THREE.BufferAttribute(eHeat, 1));
-  const emberMat = new THREE.ShaderMaterial({
-    vertexShader: /* glsl */ `
-      attribute float aBirth, aHeat; attribute vec3 aSeed;
-      uniform float uT, uS, uGain;
-      varying vec3 vCol;
-      ${GLSL}
-      void main(){
-        float age = uT - aBirth;
-        float life = mix(3.2, 6.5, aSeed.x) * mix(1.0, 0.75, aHeat);
-        vec3 p = position;
-        bool fromText = aHeat > 0.99;
-        float rise = fromText ? (0.10 * age + 0.07 * age * age) : (0.22 + 0.25 * aSeed.y) * age;
-        p.y += rise;
-        p += curl3(position * 0.35 + vec3(0.0, age * 0.18, aSeed.z * 9.0)) * 0.05 * age * (fromText ? 1.3 : 0.9);
-        p.x += sin(age * (1.0 + aSeed.y) + aSeed.z * 6.28) * 0.03 * age;
-        vec4 mv = modelViewMatrix * vec4(p, 1.0);
-        float k = age / life;
-        float alive = step(0.0, age) * (1.0 - smoothstep(0.7, 1.0, k));
-        float flick = 0.75 + 0.25 * sin(uT * (9.0 + aSeed.x * 7.0) + aSeed.y * 30.0);
-        float temp = mix(fromText ? 2600.0 : 2000.0, 1100.0, clamp(k * 1.2, 0.0, 1.0));
-        float I = (fromText ? 2.6 : 1.1) * aHeat * exp(-k * 2.2) * flick * alive * uGain;
-        I *= fromText ? (0.6 + 2.5 * exp(-age * 5.0)) : smoothstep(0.0, 0.6, age);
-        vCol = blackbody(temp) * I;
-        gl_PointSize = uS * (fromText ? 2.4 : 2.0 + 1.4 * aSeed.x) * (10.0 / -mv.z);
-        gl_Position = projectionMatrix * mv;
-        if (I < 0.001) gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
-      }`,
-    fragmentShader: /* glsl */ `
-      varying vec3 vCol;
-      void main(){ vec2 d = gl_PointCoord - 0.5; float a = exp(-dot(d, d) * 14.0); gl_FragColor = vec4(vCol * a, 1.0); }`,
-    uniforms: { uT: { value: 0 }, uS: { value: S }, uGain: { value: 1 } },
-    transparent: true, depthTest: false, depthWrite: false, blending: THREE.AdditiveBlending,
-  });
-  const embers = new THREE.Points(eg, emberMat);
-  embers.frustumCulled = false;
-  camera.add(embers);
-
-  const ep = ctx.card('epigraph');
+  // ---- 余烬：从画面下方升起，交叉淡入第一幕时被卷进分子云 ----
+  const embers = makeEpigraph(ctx, camera, { ambient: { count: 340, from: 17.5, to: 26.0 } });
 
   return {
     render(f) {
@@ -239,10 +169,10 @@ export default async function create(ctx) {
       camera.position.set(0.25 * Math.sin(T * 0.07), 0.12 * Math.sin(T * 0.05 + 1.0), z);
       camera.rotation.set(0.004 * Math.sin(T * 0.09), 0.006 * Math.sin(T * 0.06 + 2.0), THREE.MathUtils.degToRad(-0.5 + 0.5 * Math.sin(T * 0.045)));
       camera.updateMatrixWorld();
-      // 题记期间星空收暗，让位给文字
-      const dimEpi = 1 - 0.45 * util.envelope(T, 19.5, 21.5, 28.5, 31.5);
-      const nebula = (0.35 + 0.65 * smoothstep(5.5, 12, T)) * (1 - 0.3 * util.envelope(T, 19.5, 21.5, 28.5, 31.5));
-      field.update(T, camera, { intensity: dimEpi, nebula, boost: 1.4, nodeGain: 1.0 });
+      // 漂流段星空略收暗，让余烬成为主体
+      const dim = 1 - 0.35 * smoothstep(18.5, 22.0, T);
+      const nebula = (0.35 + 0.65 * smoothstep(5.5, 12, T)) * (1 - 0.25 * smoothstep(18.5, 22.0, T));
+      field.update(T, camera, { intensity: dim, nebula, boost: 1.4, nodeGain: 1.0 });
       lineMat.uniforms.uT.value = T;
       lineMat.uniforms.uRetract.value = ease.inOutCubic(invLerp(15.8, 17.2, T));
       lineMat.uniforms.uGain.value = 0.9 * (1 - smoothstep(16.6, 17.4, T));
@@ -250,8 +180,7 @@ export default async function create(ctx) {
       flareMat.uniforms.uT.value = T;
       flareMat.uniforms.uGain.value = 1 - smoothstep(15.5, 17.0, T);
       flares.visible = T > 4.9 && T < 17.2;
-      emberMat.uniforms.uT.value = T;
-      embers.visible = T > 19.0;
+      embers.update(T);
       ctx.renderer.setRenderTarget(f.target);
       ctx.renderer.render(scene, camera);
 
@@ -263,7 +192,7 @@ export default async function create(ctx) {
         streak: 0.12 + 0.9 * firstStar + 0.18 * util.envelope(T, 9.4, 10, 12.6, 13.8),
         streakTint: [0.38, 0.6, 1.0],
         vignette: 0.42, grain: 0.04, ca: 0.0006, saturation: 0.95,
-        temperature: -0.15 + 0.35 * util.envelope(T, 19.5, 22, 28, 31.5),
+        temperature: -0.15 + 0.3 * smoothstep(18.5, 23.0, T),
         fade: T < ign[0] - 0.05 ? 0 : 1,
       };
     },
@@ -275,114 +204,12 @@ export default async function create(ctx) {
       if (a > 0.001) {
         const [x, y] = ctx.project(new THREE.Vector3(0, LOGO_Y0 - 1.25, LOGO_Z), camera);
         const blur = (1 - Math.min(1, ease.outCubic(invLerp(12.7, 13.9, T)))) * 5;
-        overlay.glowText(g, '出 品', x - 22 * S, y, { font: `300 ${17 * S}px ${overlay.FONTS.zh}`, color: overlay.COLORS.paper, alpha: a * 0.85, glow: 0.3, blur, spacing: `${6 * S}px`, align: 'right', S });
+        overlay.glowText(g, '出 品', x - 22 * S, y, { font: `${overlay.TYPE.zhWeight} ${17 * S * overlay.TYPE.card}px ${overlay.FONTS.zh}`, color: overlay.COLORS.paper, alpha: a * 0.85, glow: 0.3, blur, spacing: `${6 * S}px`, align: 'right', S });
         overlay.glowText(g, '·', x, y - 1 * S, { font: `400 ${18 * S}px ${overlay.FONTS.en}`, color: overlay.COLORS.paper, alpha: a * 0.75, glow: 0, blur, align: 'center', S });
-        overlay.glowText(g, 'PRESENTS', x + 22 * S, y - 1 * S, { font: `300 ${11.5 * S}px ${overlay.FONTS.mono}`, color: overlay.COLORS.paper, alpha: a * 0.7, glow: 0, blur, spacing: `${5.5 * S}px`, align: 'left', S });
+        overlay.glowText(g, 'PRESENTS', x + 22 * S, y - 1 * S, { font: `300 ${11.5 * S * overlay.TYPE.card}px ${overlay.FONTS.mono}`, color: overlay.COLORS.paper, alpha: a * 0.7, glow: 0, blur, spacing: `${5.5 * S}px`, align: 'left', S });
       }
-      if (T > ep.in - 0.1 && T < 28.6) drawEpigraph(g, T, glyphs, ep, util, overlay, S, W, H);
     },
 
-    dispose() { field.dispose(); lg.dispose(); lineMat.dispose(); fg.dispose(); flareMat.dispose(); eg.dispose(); emberMat.dispose(); },
+    dispose() { field.dispose(); lg.dispose(); lineMat.dispose(); fg.dispose(); flareMat.dispose(); embers.dispose(); },
   };
-}
-
-// ---- 题记排版与绘制 ----
-function layoutEpigraph(W, H, S) {
-  const size = 36 * S, adv = 52 * S, colGap = 74 * S;
-  const x0 = W * 0.79, y0 = H * 0.21;
-  const glyphs = [];
-  let order = 0;
-  COLS.forEach((col, ci) => {
-    [...col].forEach((ch, k) => {
-      const p = PUNCT.has(ch);
-      glyphs.push({ ch, x: x0 - ci * colGap + (p ? 0.42 * size : 0), y: y0 + k * adv + size + (p ? -0.58 * size : 0), size, order: order++, kind: 'main' });
-    });
-  });
-  // 出处：第三列，起笔更低，字更小
-  const ss = 17 * S, sadv = 22 * S;
-  [...SOURCE].forEach((ch, k) => glyphs.push({ ch, x: x0 - 2 * colGap + 6 * S, y: y0 + 6 * adv + k * sadv + ss, size: ss, order: 100 + k, kind: 'source' }));
-  return glyphs;
-}
-
-// 文字燃烧时间：主文逐字自上而下
-const burnTime = (gl) => 27.0 + gl.order * 0.075;
-
-function sampleGlyphs(glyphs, W, H, S) {
-  const c = document.createElement('canvas'); c.width = W; c.height = H;
-  const g = c.getContext('2d', { willReadFrequently: true });
-  const out = [];
-  const r = (() => { let a = 12345; return () => ((a = (a * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff); })();
-  for (const gl of glyphs) {
-    if (gl.kind !== 'main') continue;
-    g.clearRect(0, 0, W, H);
-    g.font = `300 ${gl.size}px "Noto Serif SC"`;
-    g.fillStyle = '#fff'; g.textAlign = 'center'; g.textBaseline = 'alphabetic';
-    g.fillText(gl.ch, gl.x, gl.y);
-    const x0 = Math.max(0, Math.floor(gl.x - gl.size)), y0 = Math.max(0, Math.floor(gl.y - gl.size * 1.2));
-    const w = Math.min(W - x0, Math.ceil(gl.size * 2)), h = Math.min(H - y0, Math.ceil(gl.size * 1.6));
-    const d = g.getImageData(x0, y0, w, h).data;
-    const cand = [];
-    for (let y = 0; y < h; y += 1) for (let x = 0; x < w; x += 1) if (d[(y * w + x) * 4 + 3] > 110) cand.push([x0 + x, y0 + y]);
-    const n = Math.min(cand.length, Math.round(260 * S + 40));
-    const tb = burnTime(gl);
-    for (let k = 0; k < n; k++) {
-      const p = cand[Math.floor(r() * cand.length)];
-      out.push({ x: p[0], y: p[1], t: tb + r() * 0.35 });
-    }
-  }
-  return out;
-}
-
-function drawEpigraph(g, T, glyphs, ep, util, overlay, S, W, H) {
-  const { clamp, invLerp, ease } = util;
-  const paper = overlay.COLORS.paper, ember = overlay.COLORS.ember;
-  for (const gl of glyphs) {
-    let appear, a;
-    if (gl.kind === 'main') {
-      appear = ep.in + gl.order * 0.2;
-      const k = clamp((T - appear) / 0.9);
-      if (k <= 0) continue;
-      const tb = burnTime(gl);
-      const burn = clamp((T - tb) / 0.32);
-      a = ease.outCubic(clamp((T - appear) / 0.35)) * (1 - burn);
-      if (a <= 0.001) continue;
-      // 先如余烬般发暖光，再沉为纸白；燃烧时再次变热
-      const heat = Math.max(1 - ease.outCubic(k), ease.inQuad(burn) * 1.4, 0.0);
-      const col = paper.map((c, i) => Math.round(c + (ember[i] - c) * clamp(heat)));
-      g.save();
-      g.font = `300 ${gl.size}px ${overlay.FONTS.zh}`;
-      g.textAlign = 'center';
-      g.filter = `blur(${(10 + 6 * heat) * S}px)`;
-      g.fillStyle = overlay.rgba(col, a * (0.22 + 0.55 * heat));
-      g.fillText(gl.ch, gl.x, gl.y);
-      g.filter = 'none';
-      g.fillStyle = overlay.rgba(col, a);
-      g.fillText(gl.ch, gl.x, gl.y);
-      g.restore();
-    } else {
-      appear = 24.0;
-      a = util.envelope(T, appear, appear + 0.9, 26.6, 27.5) * 0.62;
-      if (a <= 0.001) continue;
-      g.save();
-      g.fillStyle = overlay.rgba(paper, a);
-      if (gl.order === 100) {
-        // 竖排破折号：两字高的一条细线
-        g.fillRect(gl.x - 0.5 * S, gl.y - gl.size * 0.95, Math.max(1, 1 * S), gl.size * 2.1);
-      } else if (gl.ch.trim()) {
-        g.font = `300 ${gl.size}px ${overlay.FONTS.zh}`;
-        g.textAlign = 'center';
-        g.fillText(gl.ch, gl.x, gl.y);
-      }
-      g.restore();
-    }
-  }
-  // 英文：左下
-  const ea = util.envelope(T, 24.3, 25.5, 26.4, 27.3);
-  if (ea > 0.001) {
-    const blur = (1 - ease.outCubic(clamp((T - 24.3) / 1.2))) * 5;
-    const x = W * 0.085, y = H * 0.77;
-    const enLines = ['The fuel is spent;', 'the fire passes on.', 'No one knows where it ends.'];
-    enLines.forEach((ln, i) => overlay.glowText(g, ln, x, y - 34 * S + i * 34 * S, { font: `italic 300 ${25 * S}px ${overlay.FONTS.en}`, color: paper, alpha: ea * 0.82, glow: 0.18, blur, spacing: `${0.6 * S}px`, align: 'left', S }));
-    overlay.glowText(g, ep.enSource, x, y + 108 * S, { font: `300 ${11.5 * S}px ${overlay.FONTS.mono}`, color: paper, alpha: ea * 0.5, glow: 0, blur, spacing: `${4 * S}px`, align: 'left', S });
-  }
 }

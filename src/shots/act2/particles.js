@@ -72,9 +72,9 @@ export function makeParticles(ctx) {
   }));
 
   // 火柴：从右前方划燃，火苗移向烛芯，点着后撤出画面
-  function matchAt(T, cue, wick) {
+  function matchAt(T, cue, wick, origin) {
     const ts = cue('match_strike'), tc = cue('flame_catch');
-    const M0 = [3.2, wick[1] + 1.3, 3.0];
+    const M0 = origin;
     if (T < ts || T > tc + 1.4) return { I: 0, p: M0, on: false };
     const flash = Math.exp(-Math.max(0, T - ts) / 0.07) * 1.6;
     const approach = util.ease.inOutCubic(util.invLerp(ts + 0.15, tc, T));

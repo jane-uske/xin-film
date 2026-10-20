@@ -6,7 +6,7 @@ import * as glsl from './glsl.js';
 import * as overlay from './overlay.js';
 import { Post, defaultGrade, fsq, passMaterial } from './post.js';
 
-const SELF_DRAWN_CARDS = new Set(['vertical', 'credits']);
+const SELF_DRAWN_CARDS = new Set(['vertical', 'credits', 'log']);
 
 export class Engine {
   constructor(canvas, timeline, { scale = 1 } = {}) {

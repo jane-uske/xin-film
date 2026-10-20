@@ -1,11 +1,14 @@
 // 尾声：S19 星海（开场推镜的镜像：后拉）、S20 片名「芯」、S21 片尾字幕。同一片星空贯穿。
 //   S19  两点暖光并排像火焰般闪烁；继续后拉，越来越多成对、成簇的小火出现
 //   S20  余烬笔尖按笔顺写出「心」，灯芯草般的「艹」自上落下合成「芯」，整体一亮，下方浮出 XIN
+//   S19  （第二版）庄子题记竖排浮现，随后燃成余烬飘向群星间的小火——火传也
 //   S21  星座出品方字标与"每一帧画面、每一个音符，皆由代码生成"
+//   S22  黑场里一行系统日志："会话结束 · 上下文已清除"
 import * as THREE from 'three';
 import { createStarfield } from '../common/starfield.js';
 import { all as GLSL } from '../../engine/glsl.js';
 import { layoutWord } from '../common/astra.js';
+import { makeEpigraph } from '../common/epigraph.js';
 import { LABELS } from '../common/labels.js';
 
 // 「芯」在 600×600 画布上（200 字重，440px，居中）的「心」部笔画中心线
@@ -44,6 +47,8 @@ export default async function create(ctx) {
   scene.add(field.bg, field.points);
   const camera = new THREE.PerspectiveCamera(30, W / H, 0.05, 6000);
   scene.add(camera);
+  const epi = makeEpigraph(ctx, camera, { card: ctx.card('zhuangzi'), burnStart: ctx.cue('zhuangzi_dissolve'), y0f: 0.14 });
+  const session = ctx.card('session');
   const camZ = (T) => -200 + 26 * ease.inOutSine(clamp((T - T0) / 16)) + 0.5 * Math.max(0, T - (T0 + 16));
 
   // ---- 宇宙里的小火：成对、成簇，像火焰般闪烁 ----
@@ -176,6 +181,7 @@ export default async function create(ctx) {
       field.update(T, camera, { intensity: dim, nebula: 0.85 * dim, nodeGain: 1 });
       fireMat.uniforms.uT.value = T;
       fireMat.uniforms.uGain.value = 1 - 0.6 * titlePhase;
+      epi.update(T);
       ctx.renderer.setRenderTarget(f.target);
       ctx.renderer.render(scene, camera);
 
@@ -207,22 +213,26 @@ export default async function create(ctx) {
       const la = envelope(T, latinT, latinT + 1.4, titleOut, titleOut + 0.9);
       if (la > 0.001) {
         const blur = (1 - ease.outCubic(clamp((T - latinT) / 1.4))) * 4;
-        overlay.glowText(g, 'XIN', W / 2 + 9 * S, cy + D * 0.5 + 34 * S, { font: `300 ${19 * S}px ${overlay.FONTS.en}`, color: overlay.COLORS.paper, alpha: la * 0.8, glow: 0.25, blur, spacing: `${18 * S}px`, S });
+        overlay.glowText(g, 'XIN', W / 2 + 9 * S, cy + D * 0.5 + 34 * S, { font: `300 ${19 * S * overlay.TYPE.card}px ${overlay.FONTS.en}`, color: overlay.COLORS.paper, alpha: la * 0.8, glow: 0.25, blur, spacing: `${18 * S}px`, S });
       }
       // 「芯」的三层意思，晚半拍浮现
       const sa = envelope(T, latinT + 0.9, latinT + 2.1, titleOut, titleOut + 0.9);
       if (sa > 0.001) {
         const blur = (1 - ease.outCubic(clamp((T - latinT - 0.9) / 1.2))) * 4;
-        const y0 = cy + D * 0.5 + 72 * S;
-        overlay.glowText(g, LABELS.title.zh, W / 2 + 4 * S, y0, { font: `300 ${15 * S}px ${overlay.FONTS.zh}`, color: overlay.COLORS.paper, alpha: sa * 0.72, glow: 0.15, blur, spacing: `${8 * S}px`, S });
-        overlay.glowText(g, LABELS.title.en, W / 2 + 3 * S, y0 + 24 * S, { font: `300 ${9.5 * S}px ${overlay.FONTS.mono}`, color: overlay.COLORS.paper, alpha: sa * 0.45, glow: 0, blur, spacing: `${5 * S}px`, S });
+        const y0 = cy + D * 0.5 + 76 * S * overlay.TYPE.card;
+        overlay.glowText(g, LABELS.title.zh, W / 2 + 4 * S, y0, { font: `300 ${15 * S * overlay.TYPE.card}px ${overlay.FONTS.zh}`, color: overlay.COLORS.paper, alpha: sa * 0.72, glow: 0.15, blur, spacing: `${8 * S}px`, S });
+        overlay.glowText(g, LABELS.title.en, W / 2 + 3 * S, y0 + 26 * S * overlay.TYPE.card, { font: `300 ${9.5 * S * overlay.TYPE.card}px ${overlay.FONTS.mono}`, color: overlay.COLORS.paper, alpha: sa * 0.45, glow: 0, blur, spacing: `${5 * S}px`, S });
       }
+      // 庄子题记
+      epi.draw(g, T);
+      // 会话结束：黑场里逐字打出的一行系统日志
+      if (T > session.in - 0.05 && T < session.out + 1.0) drawSession(g, T, session, W, H, S, overlay, util);
       // 片尾
       const ca = envelope(T, credits.in, credits.in + 1.3, credits.out - 1.0, credits.out);
       if (ca > 0.001) drawCredits(g, T, ca, credits, logo, W, H, S, overlay);
     },
 
-    dispose() { field.dispose(); fg.dispose(); fireMat.dispose(); heartT.dispose(); grassT.dispose(); revealT.dispose(); titleMat.dispose(); },
+    dispose() { epi.dispose(); field.dispose(); fg.dispose(); fireMat.dispose(); heartT.dispose(); grassT.dispose(); revealT.dispose(); titleMat.dispose(); },
   };
 }
 
@@ -244,6 +254,21 @@ function drawCredits(g, T, a, card, logo, W, H, S, overlay) {
     g.fillStyle = rg; g.beginPath(); g.arc(x, y, 5 * S, 0, Math.PI * 2); g.fill();
   });
   g.restore();
-  overlay.glowText(g, card.zh, W / 2 + 4 * S, H * 0.57, { font: `300 ${21 * S}px ${overlay.FONTS.zh}`, color: paper, alpha: a * 0.88, glow: 0.2, spacing: `${7 * S}px`, S });
-  overlay.glowText(g, card.en, W / 2, H * 0.57 + 38 * S, { font: `italic 300 ${19 * S}px ${overlay.FONTS.en}`, color: paper, alpha: a * 0.66, glow: 0.12, spacing: `${0.8 * S}px`, S });
+  overlay.glowText(g, card.zh, W / 2 + 4 * S, H * 0.57, { font: `${overlay.TYPE.zhWeight} ${21 * S * overlay.TYPE.card}px ${overlay.FONTS.zh}`, color: paper, alpha: a * 0.88, glow: 0.2, spacing: `${7 * S}px`, S });
+  overlay.glowText(g, card.en, W / 2, H * 0.57 + 42 * S * overlay.TYPE.card, { font: `italic 300 ${19 * S * overlay.TYPE.card}px ${overlay.FONTS.en}`, color: paper, alpha: a * 0.66, glow: 0.12, spacing: `${0.8 * S}px`, S });
+}
+
+function drawSession(g, T, card, W, H, S, overlay, util) {
+  const { clamp, smoothstep } = util;
+  const t = T - card.in, rate = 9;
+  const a = 0.85 * (1 - smoothstep(card.out, card.out + 0.8, T));
+  const nz = Math.min(card.zh.length, Math.max(0, Math.floor(t * rate)));
+  const te = t - card.zh.length / rate - 0.25;
+  const ne = Math.min(card.en.length, Math.max(0, Math.floor(te * rate * 2.2)));
+  const done = ne >= card.en.length;
+  // 打字时光标常亮；打完闪两下后停住、消失
+  const blinkOn = !done || (te - card.en.length / (rate * 2.2) < 1.6 && (T % 1.0) < 0.55);
+  const y = H * 0.5;
+  overlay.hudText(g, card.zh.slice(0, nz) + (ne === 0 && blinkOn ? '▍' : ''), W / 2, y, { size: 13, alpha: a, S, align: 'center', weight: 400, spacing: 0.18 });
+  if (ne > 0) overlay.hudText(g, card.en.slice(0, ne) + (blinkOn ? '▍' : ''), W / 2, y + 26 * S, { size: 8.5, alpha: a * 0.5, S, align: 'center' });
 }
