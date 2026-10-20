@@ -95,8 +95,8 @@ export default async function create(ctx) {
   function poseCandlePush(T, st) {
     const u = ease.inOutSine(invLerp(cue('flame_catch') + 0.3, cue('track_right'), T));
     const c = flameCenterC(st);
-    const tg = V3(0, lerp(st.wickY + 0.2, c.y - 0.75, u), 0);
-    const dist = logLerp(25, 15.8, u);
+    const tg = V3(0, lerp(st.wickY + 0.2, c.y - 1.05, u), 0);
+    const dist = logLerp(25, 18.0, u);
     return { tg, dist, az: lerp(-0.035, 0.0, u), el: lerp(5.0, 2.4, u) * D2R, hand: smoothstep(cue('flame_catch'), cue('flame_catch') + 1.5, T) };
   }
   const twoShot = (y) => ({ tg: V3(DIG.X / 2, y, 0), dist: 26, az: 0, el: 2.0 * D2R });
@@ -203,8 +203,10 @@ export default async function create(ctx) {
     const u = (T - a) / (b - a);
     const pos = V3(lerp(5.2, 3.2, u), 14.3, lerp(15.5, 14.5, u));
     const bearing = Math.atan2(DIG.X - pos.x, pos.z);
-    const yaw = bearing + 15 * D2R;
-    const pitch = -12 * D2R;
+    // 字幕卡 c4a 之前：镜头随呼吸缓缓下俯、偏开，让那团火升到画面左上，下三分之一留给黑暗
+    const cardMove = smoothstep(cue('card_c4a_in') - 4.5, cue('card_c4a_in') - 0.3, T);
+    const yaw = bearing + (15 + 6.5 * cardMove) * D2R;
+    const pitch = (-12 - 1.2 * cardMove) * D2R;
     const dir = V3(Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), -Math.cos(yaw) * Math.cos(pitch));
     return { pos, tg: pos.clone().add(dir.multiplyScalar(40)), hand: smoothstep(cue('warm_shift_start'), cue('warm_shift_end'), T) * 0.9 };
   }
@@ -323,9 +325,9 @@ export default async function create(ctx) {
       flO.f0[0] = lerp(flO.f0[0], ex.f0[0] * 1.3 + leanD, own); flO.f0[2] = lerp(flO.f0[2], ex.f0[2] * (1 - 0.3 * burn) * (1 + 0.36 * lean / 1.27) * stretch, own * 0.6);
       flO.f1[2] = lerp(flO.f1[2], ex.f1[2], own);
     }
-    const digVisible = T >= digOn - 0.6;
+    const digVisible = T >= digOn - 1.8;
     const appear = smoothstep(digOn, digOn + 0.08, T);   // 一帧之内亮起
-    const wake = smoothstep(digOn - 0.6, digOn - 0.1, T);  // 芯片先亮一个点
+    const wake = smoothstep(digOn - 1.7, digOn - 1.2, T);  // 芯片先亮一个点（镜头还在平移时）
     const o = digital.orig.u;
     const warm = warmAt(T);
     const soft = smoothstep(cue('warm_shift_start') + 1.0, cue('warm_shift_end') + 0.5, T);
@@ -396,7 +398,8 @@ export default async function create(ctx) {
     shared.uFogCol.value.set(0.0, 0.0, 0.0);
 
     // 地面：S11–S12 的微距镜头里看不到地面，省掉它
-    floor.mesh.visible = T >= cue('track_right') - 0.5;
+    // 第三幕里地面在雾与黑暗中已不可见（实测像素差≈0），省掉它
+    floor.mesh.visible = T >= cue('track_right') - 0.5 && T < cue('ch3_in') - 0.5;
     // 第三幕末：两团火的光在地面上相遇（地面响应加强）
     const fl17 = smoothstep(cue('candle_reenter'), cue('lean_start') + 3, T);
     floor.u.uDim.value = 1 + 35 * fl17;
@@ -437,7 +440,7 @@ export default async function create(ctx) {
 
     // ---- HUD 数据 ----
     hud = { T, Tm, n, powerOff, origScreen: ctx.project(V3(dp.x, dp.wickY + 1.6, 0), camera), lvl,
-      chipScreen: ctx.project(V3(dp.x + DIG.chipHW, dp.top + DIG.chipH * 0.5, 0), camera),
+      chipScreen: ctx.project(V3(dp.x + 0.2, dp.top + DIG.chipH + 0.04, 0), camera),
       origSide: ctx.project(V3(dp.x + 0.62, dp.wickY + 1.15, 0), camera),
       verdictAnchor: ctx.project(verdictPoint(dp), camera),
       origTop: ctx.project(V3(dp.x, dp.wickY + 3.15, 0), camera), origBot: ctx.project(V3(dp.x, dp.wickY - 0.15, 0), camera) };
@@ -557,8 +560,8 @@ export default async function create(ctx) {
     g.globalAlpha *= sagAt(T);
     // S13：AI 芯片（第一幕标注过的同一块芯片）+ 模拟的火 · 学习进度
     const s13a = digOn + 0.3, s13b = cue('card_c2b_in') - 0.6;
-    if (T > digOn - 0.6 && T < s13b && hud.chipScreen) {
-      const tc = digOn - 0.6;
+    if (T > digOn - 1.5 && T < s13b && hud.chipScreen) {
+      const tc = digOn - 1.5;
       const a = util.envelope(T, tc, tc + 0.2, s13b - 1.4, s13b - 0.6);
       overlay.hudCallout(g, { anchor: hud.chipScreen, dir: [1, 0.18], len: 85, t: T - tc, alpha: a * 0.9, S,
         lines: [{ text: LABELS.chip.name }, { text: LABELS.chip.en, en: true }] });

@@ -189,10 +189,10 @@ export default async function create(ctx) {
   // spherical camera around the brain centre (local coords)
   const orbit = (az, el, D, look = BRAIN_C, side = 0) => ({ p: [BRAIN_C[0] + D * Math.cos(el) * Math.sin(az), BRAIN_C[1] + D * Math.sin(el), BRAIN_C[2] + D * Math.cos(el) * Math.cos(az)], l: [look[0] + Math.cos(az) * side, look[1], look[2] - Math.sin(az) * side], u: [0, 1, 0], fov: 30 });
   const DIVE_END = { p: [0.0, 1.3, 1.05], l: [0, 0.0, -0.08], u: [0, 1, 0], fov: 30 };
-  const BRAIN_A = orbit(0.30, 0.26, 3.2, BRAIN_C, 0.42);
+  const BRAIN_A = orbit(0.30, 0.26, 3.75, BRAIN_C, 0.5);
   const brainOrbit = (T) => {
     const k = ease.inOutSine(invLerp(cue.brainHud + 0.3, cue.snap, T));
-    return orbit(lerp(0.30, 0.62, k), lerp(0.26, 0.34, k), lerp(3.2, 2.95, k), BRAIN_C, 0.42);
+    return orbit(lerp(0.30, 0.55, k), lerp(0.26, 0.32, k), lerp(3.75, 3.5, k), BRAIN_C, 0.5);
   };
   function localCam(T) {
     if (T < cue.brain) {
@@ -522,14 +522,25 @@ export default async function create(ctx) {
     camTmp.position.set(...c.p); camTmp.up.set(...c.u); camTmp.lookAt(...c.l);
     camTmp.fov = c.fov; camTmp.near = c.near || 0.1; camTmp.far = c.far || 30000;
     camTmp.updateProjectionMatrix(); camTmp.updateMatrixWorld();
-    const v = new THREE.Vector3(...toW(mmToL([L.PLX + 3000, L.FLOOR + 52000, L.PLZ]))).project(camTmp);
-    return [clamp(v.x * 0.5 + 0.5, 0.55, 0.92), clamp(v.y * 0.5 + 0.5, 0.25, 0.7)]; // uv, y up
+    const v = new THREE.Vector3(...toW(mmToL([L.PLX + 1500, L.FLOOR + 22000, L.PLZ]))).project(camTmp);
+    return [clamp(v.x * 0.5 + 0.5, 0.56, 0.9), clamp(v.y * 0.5 + 0.5, 0.12, 0.4)]; // uv, y up
   })();
   const SPARK_END = [0.5, 1 - 0.45];
+  // where the chip label's text sits when the pull-out starts (normalised screen, y down)
+  const chipText = (() => {
+    const c = cosmicCam(T_PO);
+    camTmp.position.set(...c.p); camTmp.up.set(...c.u); camTmp.lookAt(...c.l);
+    camTmp.fov = c.fov; camTmp.near = c.near || 0.1; camTmp.far = c.far || 30000;
+    camTmp.updateProjectionMatrix(); camTmp.updateMatrixWorld();
+    const v = new THREE.Vector3(...toW([0.0, DIE_Y, 0.0])).project(camTmp);
+    const ax = (v.x * 0.5 + 0.5), ay = (1 - (v.y * 0.5 + 0.5));
+    const d = Math.hypot(1, 0.5);
+    return [ax - (150 / 1920) * (1 / d), ay - (150 / 1920) * (0.5 / d) * (ctx.W / ctx.H)];
+  })();
   function sparkAt(T) {
     const u = invLerp(cue.sparkRise, cue.sparkOut, T);
     const e = 1 - Math.pow(1 - u, 2.4);                       // rises, decelerates, comes to rest
-    const ctrl = [lerp(sparkFrom[0], SPARK_END[0], 0.25), Math.max(sparkFrom[1], SPARK_END[1]) + 0.1];
+    const ctrl = [lerp(sparkFrom[0], SPARK_END[0], 0.35), lerp(sparkFrom[1], SPARK_END[1], 0.85)];
     const bx = (1 - e) * (1 - e) * sparkFrom[0] + 2 * (1 - e) * e * ctrl[0] + e * e * SPARK_END[0];
     const by = (1 - e) * (1 - e) * sparkFrom[1] + 2 * (1 - e) * e * ctrl[1] + e * e * SPARK_END[1];
     const wob = (1 - e) * 0.012;
@@ -614,14 +625,22 @@ export default async function create(ctx) {
       // 2/3: the human brain (held into the snap so it can be read)
       if (T > cue.brainHud && T < cue.snap + 0.8) {
         const a = 1 - smoothstep(cue.snap + 0.25, cue.snap + 0.7, T);
-        const [x, y] = proj(toW([0.5, 1.05, 0.35]));
-        overlay.hudClassify(g, { ...LABELS.brain, fields: F, anchor: [x, y], dir: [1, -0.75], len: 120, t: T - cue.brainHud, alpha: a, S, charRate: 120 });
+        const [x, y] = proj(toW([0.66, 0.98, 0.18]));
+        overlay.hudClassify(g, { ...LABELS.brain, fields: F, anchor: [x, y], dir: [1, -0.5], len: 110, t: T - cue.brainHud, alpha: a, S, charRate: 120 });
       }
       // the chip — the same AI chip becomes the wick of the digital flame in Act II
       if (T > cue.gpuHud && T < cue.dcHud) {
         const a = 1 - smoothstep(cue.dcHud - 0.55, cue.dcHud - 0.1, T);
-        const [x, y] = proj(toW([0.0, DIE_Y, 0.0]));
-        overlay.hudCallout(g, { anchor: [x, y], dir: [-1, -0.5], len: 150, lines: [{ text: LABELS.gpu.name }, { text: LABELS.gpu.en, en: true }], t: T - cue.gpuHud, alpha: a, S, charRate: 60 });
+        let [x, y] = proj(toW([0.0, DIE_Y, 0.0]));
+        let dir = [-1, -0.5], len = 150;
+        if (T > T_PO) {
+          // keep the text where it was when the pull-out began; the leader line stretches after the die
+          x = clamp(x, 6 * S, ctx.W - 6 * S); y = clamp(y, 6 * S, ctx.H - 6 * S);
+          const tx = chipText[0] * ctx.W, ty = chipText[1] * ctx.H;
+          dir = [tx - x, ty - y]; len = Math.hypot(dir[0], dir[1]) / S;
+          if (dir[0] > -1) dir[0] = -1; // keep the text on the left side of its shelf
+        }
+        overlay.hudCallout(g, { anchor: [x, y], dir, len, lines: [{ text: LABELS.gpu.name }, { text: LABELS.gpu.en, en: true }], t: T - cue.gpuHud, alpha: a, S, charRate: 70 });
       }
       // 3/3: the datacenter
       if (T > cue.dcHud && T < cue.fade + 0.1) {

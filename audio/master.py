@@ -186,3 +186,43 @@ def qa_plots(x, cues, windows, qa_dir, stems=None):
     fig.tight_layout()
     fig.savefig(os.path.join(qa_dir, 'loudness.png'))
     plt.close(fig)
+
+
+def qa_zoom(x, tl, windows, path):
+    """Zoomed spectrograms around the key sync points (cues from the timeline)."""
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+    C = tl['cues']
+    ev = tl.get('events', {})
+    D = x.shape[1] / SR
+    spans = [(0.0, C['collapse_start'] + 1), (C['implode'] - 3, C['ignite'] + 5),
+             (C['spark_rise'] - 2, C['flame_catch'] + 3), (C['track_right'] - 1, C['card_c2b_in'] + 1),
+             (C['seed_burn'] - 2, C['copy_cascade_start'] + 2), (C['power_off'] - 3, C['ch3_in'] + 1),
+             (C['install_1'] - 1.5, C['warm_shift_end'] + 1), (C['bridge_start'] - 7, C['stars_return'] + 4),
+             (C['zhuangzi_in'] - 1, C['zhuangzi_dissolve'] + 5), (C['title_xin_heart_start'] - 1, D)]
+    mono = x.mean(axis=0)
+    fig, axs = plt.subplots(len(spans), 1, figsize=(18, 3.4 * len(spans)), dpi=70)
+    for ax, (a, b) in zip(axs, spans):
+        a, b = max(0.0, a), min(D, b)
+        seg = mono[int(a * SR):int(b * SR)]
+        f, t, S = signal.spectrogram(seg, SR, nperseg=2048, noverlap=1792)
+        ax.pcolormesh(t + a, f, 20 * np.log10(S + 1e-14), shading='auto', cmap='magma', vmin=-150, vmax=-50)
+        ax.set_yscale('symlog', linthresh=300)
+        ax.set_ylim(20, 24000)
+        for k, v in C.items():
+            if a <= v <= b:
+                ax.axvline(v, color='c', lw=0.6)
+                ax.text(v, 15000, k, color='c', fontsize=7, rotation=90)
+        for k, vs in ev.items():
+            if isinstance(vs, list) and vs and isinstance(vs[0], (int, float)) and vs[0] > 1.5:
+                for v in vs:
+                    if a <= v <= b:
+                        ax.axvline(v, color='lime', lw=0.4, ymax=0.08)
+        for wa, wb in windows:
+            if wb > a and wa < b:
+                ax.axvspan(max(a, wa), min(b, wb), color='white', alpha=0.08)
+        ax.set_xlim(a, b)
+    plt.tight_layout()
+    plt.savefig(path)
+    plt.close(fig)

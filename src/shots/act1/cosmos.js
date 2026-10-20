@@ -413,11 +413,12 @@ export function buildCosmos(ctx, scene) {
         warp += 0.45 * vec3(snoise(q * 7.0 + warp + 3.0), snoise(q * 7.0 - warp + 9.0), 0.0);
         // granules (small, fast) inside a supergranular network (large, slow)
         vec2 w1 = worley(q * 19.0 + warp * 1.25, t * 0.5);
-        vec2 w2 = worley(q * 6.0 + warp * 0.5 + 11.0, t * 0.12);
+        // supergranular network: a cheap noise ridge instead of a second Worley pass
+        float nr = abs(snoise(q * 6.0 + warp * 0.5 + 11.0 + t * 0.01));
         float fine = snoise(q * 80.0 + warp * 3.0 + t * 0.1);
         float gc = 1.0 - smoothstep(0.05, 0.9, w1.x);
         float lane = smoothstep(0.0, 0.22, w1.y - w1.x);
-        float net = smoothstep(0.0, 0.18, w2.y - w2.x);
+        float net = smoothstep(0.0, 0.12, nr);
         float cell = gc * 0.55 * (0.75 + 0.5 * fract(dot(floor(q * 19.0 + warp * 1.25), vec3(0.37, 0.71, 0.13)) * 7.0)) + lane * 0.25 + (0.5 + 0.5 * fine) * 0.12;
         cell *= 0.82 + 0.18 * net;
         float sup = snoise(q * 4.0 + warp * 0.6 + t * 0.02) * 0.5;
@@ -468,7 +469,7 @@ export function buildCosmos(ctx, scene) {
         float a = atan(vP.y, vP.x);
         float x = max(r - 1.0, 0.0);
         vec2 ca = vec2(cos(a), sin(a));
-        float st = snoise(vec3(ca * 1.6, x * 0.25 - uT * 0.012)) * 0.75 + snoise(vec3(ca * 3.2, x * 0.4 + 3.0 - uT * 0.02)) * 0.25;
+        float st = snoise(vec3(ca * 1.9, x * 0.3 - uT * 0.014));
         float streamer = 0.7 + 0.3 * st;
         float chromo = exp(-x * 55.0) * 2.4;
         float inner = exp(-x * 7.5) * 1.1 * (0.7 + 0.3 * streamer);
