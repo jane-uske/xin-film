@@ -39,6 +39,8 @@ export function startServer(port, onFrame) {
       });
       return;
     }
+    // 完整版 Chromium（--gpu）会自动请求 favicon，回个空响应，免得日志里冒出 404
+    if (url.pathname === '/favicon.ico') { res.writeHead(204); res.end(); return; }
     const f = path.join(ROOT, decodeURIComponent(url.pathname === '/' ? '/index.html' : url.pathname));
     if (!f.startsWith(ROOT)) { res.writeHead(403); res.end(); return; }
     fs.readFile(f, (e, d) => {
