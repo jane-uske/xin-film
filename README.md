@@ -22,7 +22,7 @@ npm install
 npx playwright install chromium        # 下载渲染用的浏览器
 echo '{ "word": "你的署名" }' > credit.local.json   # 可选，见下文
 python3 audio/score.py
-node tools/render.mjs --jobs 2 --gpu   # 用本机显卡；会弹出浏览器窗口，渲染时别最小化
+node tools/render.mjs --jobs 2 --gpu   # 用本机显卡（无头，不弹窗口；加 --headed 可看到窗口）
 node tools/build.mjs
 ```
 

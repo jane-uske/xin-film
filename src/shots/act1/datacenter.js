@@ -268,6 +268,12 @@ export function buildDatacenter(ctx) {
       gl_FragColor = vec4(h, 0.0, 0.0, 1.0);
     }`));
   ground.position.set((BLD.x0 + BLD.x1) / 2, FLOOR - 5, (BLD.z0 + BLD.z1) / 2);
+  // the ground sits 5 mm under the hall floor; on a real GPU (Metal) the depth buffer can't separate
+  // them from crane height and the cold ground punches through the hot aisles. Push it back in depth:
+  // nothing ever sits below it, so the software (SwiftShader) render is unchanged.
+  ground.material.polygonOffset = true;
+  ground.material.polygonOffsetFactor = 4;
+  ground.material.polygonOffsetUnits = 4;
   group.add(ground);
 
   // scattered warm dots (houses, a town on the horizon): instanced small boxes would alias, use points
