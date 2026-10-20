@@ -10,13 +10,16 @@ export const timeline = () => JSON.parse(fs.readFileSync(path.join(ROOT, 'timeli
 
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.json': 'application/json; charset=utf-8', '.css': 'text/css; charset=utf-8', '.woff2': 'font/woff2', '.woff': 'font/woff', '.wav': 'audio/wav', '.png': 'image/png' };
 
+// 不带值的开关，避免把后面的参数（如时间点）当成它的值吃掉
+const FLAGS = new Set(['gpu', 'force', 'preview']);
+
 export function parseArgs(argv = process.argv.slice(2)) {
   const out = { _: [] };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a.startsWith('--')) {
       const k = a.slice(2);
-      const v = argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[++i] : true;
+      const v = !FLAGS.has(k) && argv[i + 1] && !argv[i + 1].startsWith('--') ? argv[++i] : true;
       out[k] = v;
     } else out._.push(a);
   }
@@ -47,10 +50,13 @@ export function startServer(port, onFrame) {
   return new Promise((resolve) => server.listen(port, '127.0.0.1', () => resolve(server)));
 }
 
-export async function launch({ width, height }) {
-  const browser = await chromium.launch({
-    args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--disable-gpu-watchdog', '--disable-background-timer-throttling', '--disable-renderer-backgrounding'],
-  });
+// 默认用 SwiftShader 软件渲染（任何机器都能跑，含无显卡的云容器）；
+// 带 --gpu 时打开一个有界面的浏览器窗口，用本机显卡渲染，快几十倍。两种方式画面一致，但同一部片请用同一种方式渲完
+export async function launch({ width, height, gpu = process.argv.includes('--gpu') }) {
+  const common = ['--ignore-gpu-blocklist', '--disable-gpu-watchdog', '--disable-background-timer-throttling', '--disable-renderer-backgrounding', '--disable-backgrounding-occluded-windows'];
+  const browser = await chromium.launch(gpu
+    ? { headless: false, args: [...common, '--enable-gpu', `--window-size=${width},${height + 120}`] }
+    : { args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', ...common] });
   const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor: 1 });
   page.on('console', (m) => { const t = m.text(); if (m.type() === 'error' || m.type() === 'warning' || t.startsWith('[')) console.log(`  [page:${m.type()}] ${t}`); });
   page.on('pageerror', (e) => console.error('  [pageerror]', e.message));

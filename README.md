@@ -1,6 +1,6 @@
 # 《芯》XIN
 
-4′12″ 的全代码生成短片：画面由 Three.js / WebGL 逐帧渲染，音乐与音效由 numpy/scipy 合成，脚本自动剪辑成片。剧本与分镜见 [`SCRIPT.md`](SCRIPT.md)，写镜头模块前读 [`ENGINE.md`](ENGINE.md)。
+3′47″ 的全代码生成短片：画面由 Three.js / WebGL 逐帧渲染，音乐与音效由 numpy/scipy 合成，脚本自动剪辑成片。剧本与分镜见 [`SCRIPT.md`](SCRIPT.md)，写镜头模块前读 [`ENGINE.md`](ENGINE.md)。
 
 ## 出片
 
@@ -12,6 +12,21 @@ node tools/build.mjs                   # 拼接 + 2.39:1 遮幅 + 混入配乐 -
 ```
 
 只改了某个镜头时，用 `node tools/render.mjs --shots S12,S13 --force` 重渲与之重叠的块，再 `build`。
+
+## 在自己电脑上出片（推荐，有显卡快得多）
+
+需要：Node.js 18+、Python 3（`pip install numpy scipy matplotlib`）、ffmpeg（macOS：`brew install ffmpeg`）。
+
+```bash
+npm install
+npx playwright install chromium        # 下载渲染用的浏览器
+echo '{ "word": "你的署名" }' > credit.local.json   # 可选，见下文
+python3 audio/score.py
+node tools/render.mjs --jobs 2 --gpu   # 用本机显卡；会弹出浏览器窗口，渲染时别最小化
+node tools/build.mjs
+```
+
+不加 `--gpu` 则用 CPU 软件渲染（与云端相同，慢但哪里都能跑）。同一部片请用同一种方式渲完，避免片段之间有细微差别。
 
 ## 出品方署名
 
