@@ -411,6 +411,26 @@ def relay_thunk(label):
     return y / np.max(np.abs(y))
 
 
+def power_sag(label, dur=0.21):
+    """brown-out right before a power cut: mains buzz sagging in pitch and level,
+    two arcing crackles; ends abruptly (the cut itself is the hard gate)."""
+    rng = rng_for('sag|' + label)
+    n = ns(dur)
+    t = tvec(n)
+    u = t / dur
+    f0 = 100.0 * (1.0 - 0.45 * u ** 1.5)
+    ph = phase_of(f0)
+    buzz = sum(a * np.sin(k * ph) for k, a in [(1, 1.0), (2, 0.6), (3, 0.45), (5, 0.25), (7, 0.12)])
+    buzz *= (1.0 - 0.6 * u) * (1 - np.exp(-t / 0.004))
+    arc = np.zeros(n)
+    for t0 in (0.05, 0.14):
+        i0 = ns(t0)
+        m = min(ns(0.012), n - i0)
+        arc[i0:i0 + m] += bp(rng.standard_normal(m), 900, 5000, 2) * np.exp(-tvec(m) / 0.003)
+    y = 0.7 * buzz + 0.9 * arc
+    return y / np.max(np.abs(y))
+
+
 # ----------------------------------------------------------------------------
 # fire
 # ----------------------------------------------------------------------------

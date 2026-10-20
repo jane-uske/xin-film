@@ -340,6 +340,13 @@
       12.269,
       12.5
     ],
-    "_note": "astra_star_ignitions: the 13 hero stars of the ASTRA constellation light up (k=0 is the first star 'ting'). astra_line_ticks: each tick draws one constellation stroke group."
+    "_note": "astra_star_ignitions: the 13 hero stars of the ASTRA constellation light up (k=0 is the first star 'ting'). astra_line_ticks: each tick draws one constellation stroke group. power_sag: brightness/level multipliers for the last len(power_sag) frames (at fps) before cues.power_off — the brown-out flicker, shared by picture and sound.",
+    "power_sag": [
+      0.55,
+      1.0,
+      0.3,
+      0.75,
+      0.12
+    ]
   }
 }

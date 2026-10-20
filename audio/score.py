@@ -654,7 +654,10 @@ def build(tl):
     choir_note(mx, 'A4', cas0 + 1.8, chend, [(cas0 + 1.8, -110), (cas1, -12), (cas1 + 2, -9)] + base, 0.25, -5.0)
     choir_note(mx, 'D3', cas0 + 3.0, chend, [(cas0 + 3.0, -110), (cas1 + 1, -12), (cas1 + 3, -8)] + base, 0.0, -4.0)
     choir_note(mx, 'D5', cas0 + 3.0, chend, [(cas0 + 3.0, -110), (cas1 + 1, -14), (cas1 + 3, -10)] + base, 0.0, -8.0)
-    # power: off (gated to digital zero) ... on: relay thunk, everything back, identical
+    # power: brown-out sag right before the cut (picture flickers on the same frames),
+    # off (gated to digital zero) ... on: relay thunk, everything back, identical
+    nsag = len(E['power_sag'])
+    mx.add('sfx', PO - nsag / tl['fps'] - 0.01, X.power_sag('off', nsag / tl['fps'] + 0.01), -15.0, 0.1, {'room': 0.2})
     mx.add('sfx', PN, X.relay_thunk('on'), -10.0, 0.0, {'room': 0.35, 'hall': 0.12})
     # candle return: shorter, marked by time
     pno(mx, CR + 0.5, 'A3', 0.34, ring=5.0, gain=-12.0, p=-0.05)
@@ -911,8 +914,17 @@ def main():
     log('reverbs + stems')
     stems = mx.render(irs)
     del mx
-    mix = sum(stems[s].astype(np.float64) for s in stems)
-    N = mix.shape[1]
+    # brown-out: music and ambience dip on the same frames the picture flickers (sfx carries the sag itself)
+    N = stems[next(iter(stems))].shape[1]
+    sag = np.ones(N)
+    po = tl['cues']['power_off']
+    pat = tl['events']['power_sag']
+    fps = tl['fps']
+    for k, v in enumerate(pat):
+        a = ns(po - (len(pat) - k) / fps)
+        sag[a:min(N, ns(po - (len(pat) - k - 1) / fps))] = v
+    sag = np.convolve(sag, np.ones(ns(0.006)) / ns(0.006), 'same')
+    mix = sum(stems[s].astype(np.float64) * (1.0 if s == 'sfx' else sag) for s in stems)
     # master bus: subsonic/DC high-pass, mono below 110 Hz
     mix = hp(mix, 18.0, 4)
     mix = lp(mix, 19500.0, 8)

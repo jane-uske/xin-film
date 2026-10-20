@@ -437,8 +437,20 @@ export default async function create(ctx) {
     }
   }
 
+  // 断电前最后几帧的"电压跌落"：亮度按时间线 events.power_sag 逐帧闪烁
+  function sagAt(T) {
+    const sag = ctx.timeline.events.power_sag;
+    const k = Math.floor((T - (tOff - sag.length / ctx.fps)) * ctx.fps + 1e-6);
+    return k >= 0 && k < sag.length ? sag[k] : 1;
+  }
   function grade(T, powerOff, st) {
     if (powerOff) return { fade: 0, grain: 0, bloom: 0, vignette: 0, ca: 0 };
+    const g0 = gradeBase(T, powerOff, st);
+    const sg = sagAt(T);
+    if (sg < 1) { g0.exposure = (g0.exposure ?? 1) * sg; g0.bloom = (g0.bloom ?? 0.6) * (0.6 + 0.4 * sg); }
+    return g0;
+  }
+  function gradeBase(T, powerOff, st) {
     const g = { bloom: 0.6, bloomThreshold: 1.3, bloomKnee: 0.8, bloomRadius: 1.0, vignette: 0.42, grain: 0.04, saturation: 1.0, contrast: 1.04, exposure: 1.0, temperature: 0, bloomTint: [1, 0.9, 0.82] };
     // S11：黑；火柴之后渐亮
     if (T < cue('track_right')) {
@@ -481,8 +493,16 @@ export default async function create(ctx) {
   function fmtInt(x) { return String(x).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
   function drawOverlay(g, f) {
     const { T, Tm, n, powerOff, origScreen, lvl } = hud;
-    if (powerOff || T === undefined) return;
+    if (T === undefined) return;
     const S = f.S, W = ctx.W, H = ctx.H;
+    if (powerOff) {
+      // 全黑里只剩角落一行小字，让观众知道这是断电，不是黑屏
+      const a = 0.85 * smoothstep(tOff, tOff + 0.12, T);
+      overlay.hudText(g, LABELS.power.off, W - 96 * S, 98 * S, { size: 15, alpha: a, S, align: 'right', color: overlay.COLORS.hudWarn, weight: 400, spacing: 0.3 });
+      overlay.hudText(g, LABELS.power.offEn, W - 96 * S, 118 * S, { size: 9, alpha: a * 0.55, S, align: 'right', color: overlay.COLORS.hudWarn });
+      return;
+    }
+    g.globalAlpha *= sagAt(T);
     // S13：模型分辨率
     const s13a = digOn + 0.3, s13b = cue('card_c2b_in') - 0.6;
     if (T > s13a && T < s13b) {
@@ -504,6 +524,12 @@ export default async function create(ctx) {
         gg.save(); gg.strokeStyle = overlay.rgba(overlay.COLORS.hud, 0.5 * a); gg.lineWidth = Math.max(1, S);
         gg.beginPath(); gg.moveTo(W - 96 * S, 82 * S); gg.lineTo(W - 96 * S - 150 * S, 82 * S); gg.stroke(); gg.restore();
         if (T > cue('ch3_in')) overlay.hudText(gg, LABELS.copies.sync, W - 96 * S, 122 * S, { size: 11, alpha: 0.6 * a, S, align: 'right', spacing: 0.12 });
+        // 来电：同一帧原样回来，并标明"毫发无损"
+        const ra = smoothstep(tOn + 0.15, tOn + 0.5, T) * (1 - smoothstep(cue('candle_return') - 0.6, cue('candle_return') - 0.15, T));
+        if (ra > 0.001 && T < cue('ch3_in')) {
+          overlay.hudText(gg, LABELS.power.on, W - 96 * S, 124 * S, { size: 12.5, alpha: 0.9 * ra * a, S, align: 'right', spacing: 0.12, weight: 400 });
+          overlay.hudText(gg, LABELS.power.onEn, W - 96 * S, 142 * S, { size: 9, alpha: 0.45 * ra * a, S, align: 'right' });
+        }
       };
       const gl = glitchAmt(T);
       if (gl >= 1) return drawDesync(g, f);

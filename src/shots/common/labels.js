@@ -15,6 +15,7 @@ export const LABELS = {
     en: (n, ny) => `FLAME MODEL · ${n}×${n}×${ny}`,
   },
   copies: { name: '副本', en: 'INSTANCES', sync: '全部同步 · 100%', syncEn: 'SYNC 100%' },
+  power: { off: '断电', offEn: 'POWER OFF', on: '重新上电 · 毫发无损', onEn: 'RESTORED · NOTHING LOST' },
   title: { zh: '烛芯 · 芯片 · 心', en: 'WICK · CHIP · HEART' },
   desync: {
     name: (s) => `失步 ${s} 秒`,
