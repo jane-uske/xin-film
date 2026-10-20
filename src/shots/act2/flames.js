@@ -160,7 +160,8 @@ export default async function create(ctx) {
       } else {
         const u = ease.inOutSine(invLerp(tc, te + 1.5, T));
         const tg = fin.tg.clone().lerp(V3(DIG_NEAR / 2, st.wickY + 2.15, 0), u);
-        P = { tg, dist: lerp(23, 16.0, u), az: 0.0, el: lerp(7, 5, u) * D2R, hand: 1 };
+        const pk = ease.inCubic(invLerp(cue('bridge_start') - 1, te, T));
+        P = { tg, dist: lerp(23, 16.0, u) - 1.4 * pk, az: 0.0, el: lerp(7, 5, u) * D2R, hand: 1 };
       }
     }
     if (!P.pos) P.pos = orbit(P.tg, P.dist, P.az, P.el);
@@ -247,8 +248,30 @@ export default async function create(ctx) {
   const pxScale = () => ctx.H / (2 * Math.tan((camera.fov * D2R) / 2));
   let hud = {};
 
+  // 分类表的锚点：贴在那团变暖的火的右侧（远离两焰尖之间的光桥）
+  const scratchCam = new THREE.PerspectiveCamera(FOV, ctx.W / ctx.H, 0.3, 40000);
+  const verdictPoint = (dpq) => V3(dpq.x + 0.8, dpq.wickY + 1.55, 0);
+  // 切黑前最后一帧的锚点（S18 里光标留在原处）
+  function verdictAnchorLast() {
+    const Tl = (Math.round(cue('cut_black') * ctx.fps) - 1) / ctx.fps;
+    const stl = candleState(util, cue, Tl);
+    setCamera(scratchCam, Tl, stl);
+    return ctx.project(verdictPoint(digPose(Tl, stl)), scratchCam);
+  }
+  // 安装日志每打出一行，它就暖一分；随后 warm_shift 段一路转暖到琥珀
+  function warmAt(T) {
+    let w = 0;
+    for (const t of installT()) w += 0.12 * ease.outCubic(clamp((T - t) / 0.45));
+    return w + (1 - 0.36) * smoothstep(cue('warm_shift_start'), cue('warm_shift_end'), T);
+  }
+
   function render(f) {
     const T = f.T, S = f.S;
+    // S18：硬切全黑（无颗粒），只留光标（由 overlay 画）
+    if (T >= cue('cut_black')) {
+      hud = { T, verdictAnchor: verdictAnchorLast() };
+      return { fade: 0, grain: 0, bloom: 0, vignette: 0, ca: 0, streak: 0 };
+    }
     const st = candleState(util, cue, T);
     const dp = digPose(T, st);
     applyCamera(T, st);
@@ -270,7 +293,9 @@ export default async function create(ctx) {
     const cfc = V3(0, st.wickY + 1.2, 0);
     shared.uFlamePos.value.copy(cfc);
     shared.uFlameI.value = lit ? (0.25 + 0.75 * grow) * flC.f1[3] * 1.0 : 0;
-    candle.update(st, T, camera, flC, { gain: lit ? (0.3 + 0.7 * grow) : 0, wick: 1, amb: 0.0006 * (lit ? 1 : 0), smoke: 0.035 });
+    // 全片唯一的高潮：最后三秒，两团火更亮、光晕更满
+    const peak = smoothstep(cue('bridge_start'), cue('cut_black'), T);
+    candle.update(st, T, camera, flC, { gain: lit ? (0.3 + 0.7 * grow) * (1 + 0.12 * peak) : 0, wick: 1, amb: 0.0006 * (lit ? 1 : 0), smoke: 0.035, halo: 1 + 0.7 * peak });
     candle.flame.visible = lit; candle.halo.visible = lit; candle.smoke.visible = lit && T < cue('lattice_fade') + 30;
     // 种子的灰（S14 之后一直留在蜡上）
     const p0 = seed.update(T, px, S);
@@ -302,7 +327,7 @@ export default async function create(ctx) {
     const appear = smoothstep(digOn, digOn + 0.08, T);   // 一帧之内亮起
     const wake = smoothstep(digOn - 0.6, digOn - 0.1, T);  // 芯片先亮一个点
     const o = digital.orig.u;
-    const warm = smoothstep(cue('warm_shift_start'), cue('warm_shift_end'), T);
+    const warm = warmAt(T);
     const soft = smoothstep(cue('warm_shift_start') + 1.0, cue('warm_shift_end') + 0.5, T);
     digital.origPts.forEach((p, k) => { p.visible = digVisible && k === lvl && appear > 0 && soft < 0.999; });
     const geoL = digital.levels[lvl];
@@ -317,6 +342,7 @@ export default async function create(ctx) {
     o.uWarm.value = warm; o.uSoft.value = soft;
     let flash = 0;
     for (const s of resSteps) if (T >= s) flash = Math.max(flash, 2.5 * Math.exp(-(T - s) / 0.06));
+    for (const s of installT()) if (T >= s) flash = Math.max(flash, 0.9 * Math.exp(-(T - s) / 0.18));
     o.uFlash.value = flash;
     o.uFade.value = appear * (1 - soft);
     // 种子穿过：光点让开
@@ -328,7 +354,7 @@ export default async function create(ctx) {
     const cl = Math.hypot(cdx, cdz) || 1;
     wu.uRight.value.set(cdz / cl, -cdx / cl);
     wu.uF0.value.fromArray(flO.f0); wu.uF1.value.fromArray(flO.f1);
-    wu.uGain.value = soft * (1 - 0.25 * burn) * flO.f1[3];
+    wu.uGain.value = soft * (1 - 0.25 * burn) * flO.f1[3] * (1 + 0.12 * peak);
     wu.uTm.value = T; wu.uWarm.value = warm;
     digital.warm.mesh.visible = soft > 0.001;
     // 冷光（照亮底座、地面、蜡烛的右侧、种子）
@@ -411,6 +437,9 @@ export default async function create(ctx) {
 
     // ---- HUD 数据 ----
     hud = { T, Tm, n, powerOff, origScreen: ctx.project(V3(dp.x, dp.wickY + 1.6, 0), camera), lvl,
+      chipScreen: ctx.project(V3(dp.x + DIG.chipHW, dp.top + DIG.chipH * 0.5, 0), camera),
+      origSide: ctx.project(V3(dp.x + 0.62, dp.wickY + 1.15, 0), camera),
+      verdictAnchor: ctx.project(verdictPoint(dp), camera),
       origTop: ctx.project(V3(dp.x, dp.wickY + 3.15, 0), camera), origBot: ctx.project(V3(dp.x, dp.wickY - 0.15, 0), camera) };
 
     // ---- 调色 ----
@@ -490,34 +519,50 @@ export default async function create(ctx) {
       g.fade = 1 - 0.85 * util.envelope(T, tr, tr + 0.25, tr + 0.3, tr + 0.6);
       g.fade *= 1 - smoothstep(cue('ch3_in') - 1.1, cue('ch3_in') - 0.5, T);
     } else if (T < cue('lattice_fade')) {
-      const w = smoothstep(cue('warm_shift_start'), cue('warm_shift_end'), T);
+      const w = warmAt(T);
       g.temperature = lerp(-0.22, 0.02, w); g.bloomTint = [lerp(0.75, 1.0, w), 0.92, lerp(1.0, 0.85, w)];
       g.fade = smoothstep(cue('ch3_in') - 0.5, cue('ch3_in') + 1.0, T);
       const c = util.envelope(T, cue('card_c4a_in') - 0.5, cue('card_c4a_in') + 0.8, cue('card_c4a_out') - 0.5, cue('card_c4a_out') + 0.3);
       g.exposure *= 1 - 0.1 * c; g.vignette += 0.12 * c;
     } else {
       g.temperature = 0.1; g.bloomTint = [1.0, 0.9, 0.82];
-      g.bloom = lerp(0.85, 1.0, smoothstep(cue('bridge_start'), cue('cut_black'), T));
+      const pk = smoothstep(cue('bridge_start'), cue('cut_black'), T);
+      g.bloom = lerp(0.85, 1.18, pk); g.exposure = 1 + 0.07 * pk; g.temperature = 0.1 + 0.05 * pk;
     }
     return g;
   }
 
-  // ---------- HUD：机器的目光（只在数据之火上） ----------
+  // ---------- HUD：机器的目光（只在数据之火上，从不在蜡烛上） ----------
   function fmtInt(x) { return String(x).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
+  // 逐字打出（与 hudCallout 同一节奏）
+  const typed = (text, t, rate = 30) => (t <= 0 ? '' : text.slice(0, Math.floor(t * rate)) + (t * rate < text.length ? '▍' : ''));
+  const right = (gg, text, x, y, o) => overlay.hudText(gg, text, x, y, { align: 'right', ...o });
+
   function drawOverlay(g, f) {
-    const { T, Tm, n, powerOff, origScreen, lvl } = hud;
+    const { T, n, powerOff, origScreen, lvl } = hud;
     if (T === undefined) return;
     const S = f.S, W = ctx.W, H = ctx.H;
+    // S18：切黑之后，只有分类表第二栏的光标还在原处闪
+    if (T >= cue('cut_black')) {
+      if (T < cue('cursor_end')) drawVerdict(g, f, T, hud.verdictAnchor, true);
+      return;
+    }
     if (powerOff) {
       // 全黑里只剩角落一行小字，让观众知道这是断电，不是黑屏
       const a = 0.85 * smoothstep(tOff, tOff + 0.12, T);
-      overlay.hudText(g, LABELS.power.off, W - 96 * S, 98 * S, { size: 15, alpha: a, S, align: 'right', color: overlay.COLORS.hudWarn, weight: 400, spacing: 0.3 });
-      overlay.hudText(g, LABELS.power.offEn, W - 96 * S, 118 * S, { size: 9, alpha: a * 0.55, S, align: 'right', color: overlay.COLORS.hudWarn });
+      right(g, LABELS.power.off, W - 96 * S, 98 * S, { size: 15, alpha: a, S, color: overlay.COLORS.hudWarn, weight: 400, spacing: 0.3 });
+      right(g, LABELS.power.offEn, W - 96 * S, 118 * S, { size: 9, alpha: a * 0.55, S, color: overlay.COLORS.hudWarn });
       return;
     }
     g.globalAlpha *= sagAt(T);
-    // S13：模型分辨率
+    // S13：AI 芯片（第一幕标注过的同一块芯片）+ 模拟的火 · 学习进度
     const s13a = digOn + 0.3, s13b = cue('card_c2b_in') - 0.6;
+    if (T > digOn - 0.6 && T < s13b && hud.chipScreen) {
+      const tc = digOn - 0.6;
+      const a = util.envelope(T, tc, tc + 0.2, s13b - 1.4, s13b - 0.6);
+      overlay.hudCallout(g, { anchor: hud.chipScreen, dir: [1, 0.18], len: 85, t: T - tc, alpha: a * 0.9, S,
+        lines: [{ text: LABELS.chip.name }, { text: LABELS.chip.en, en: true }] });
+    }
     if (T > s13a && T < s13b) {
       const a = util.envelope(T, s13a, s13a + 0.3, s13b - 0.8, s13b);
       const [N, NY] = DIG.levels[lvl];
@@ -526,57 +571,96 @@ export default async function create(ctx) {
         lines: [{ text: LABELS.model.name }, { text: LABELS.model.fit(lvl >= 4 ? '99.96' : ((0.62 + lvl * 0.09) * 100).toFixed(0)) },
           { text: LABELS.model.en(N, NY), en: true }] });
     }
-    // S15–S16：实例计数
-    const c0 = cue('copy_2') - 0.6, c1 = cue('hud_glitch') + 1.4;
+    // S15–S16：副本计数（右上角）
+    const c0 = cue('copy_2') - 0.6, c1 = cue('hud_glitch') + 1.6;
+    const gl = glitchAmt(T);
     if (T > c0 && T < c1 && !(T > cue('candle_return') - 0.1 && T < cue('ch3_in') + 0.8)) {
       const k = Math.min(n, 20);
-      const a = smoothstep(c0, c0 + 0.4, T);
+      const a = smoothstep(c0, c0 + 0.4, T) * (1 - smoothstep(cue('hud_glitch') + 0.6, cue('hud_glitch') + 1.5, T));
+      const X = W - 96 * S;
       const drawCounter = (gg) => {
-        overlay.hudText(gg, `${LABELS.copies.name}  ${LABELS.copies.en}`, W - 96 * S, 74 * S, { size: 10.5, alpha: 0.6 * a, S, align: 'right' });
-        overlay.hudText(gg, fmtInt(2 ** k), W - 96 * S, 98 * S, { size: 19, alpha: 0.9 * a, S, align: 'right', weight: 300, spacing: 0.12 });
+        right(gg, `${LABELS.copies.name}  ${LABELS.copies.en}`, X, 74 * S, { size: 10.5, alpha: 0.6 * a, S });
+        right(gg, fmtInt(2 ** k), X, 100 * S, { size: 19, alpha: 0.9 * a, S, weight: 300, spacing: 0.12 });
         gg.save(); gg.strokeStyle = overlay.rgba(overlay.COLORS.hud, 0.5 * a); gg.lineWidth = Math.max(1, S);
-        gg.beginPath(); gg.moveTo(W - 96 * S, 82 * S); gg.lineTo(W - 96 * S - 150 * S, 82 * S); gg.stroke(); gg.restore();
-        if (T > cue('ch3_in')) overlay.hudText(gg, LABELS.copies.sync, W - 96 * S, 122 * S, { size: 11, alpha: 0.6 * a, S, align: 'right', spacing: 0.12 });
-        // 来电：同一帧原样回来，并标明"毫发无损"
-        const ra = smoothstep(tOn + 0.15, tOn + 0.5, T) * (1 - smoothstep(cue('candle_return') - 0.6, cue('candle_return') - 0.15, T));
-        if (ra > 0.001 && T < cue('ch3_in')) {
-          overlay.hudText(gg, LABELS.power.on, W - 96 * S, 124 * S, { size: 12.5, alpha: 0.9 * ra * a, S, align: 'right', spacing: 0.12, weight: 400 });
-          overlay.hudText(gg, LABELS.power.onEn, W - 96 * S, 142 * S, { size: 9, alpha: 0.45 * ra * a, S, align: 'right' });
+        gg.beginPath(); gg.moveTo(X, 82 * S); gg.lineTo(X - 190 * S, 82 * S); gg.stroke(); gg.restore();
+        if (T < cue('ch3_in')) {
+          // 指数爆发开始后：任何一个都可替换
+          const tn = T - (cue('copy_cascade_start') + 0.9);
+          if (tn > 0) {
+            right(gg, typed(LABELS.copies.note, tn, 14), X, 132 * S, { size: 13, alpha: 0.9 * a, S, weight: 400, spacing: 0.14 });
+            right(gg, LABELS.copies.noteEn, X, 152 * S, { size: 9, alpha: 0.45 * a * smoothstep(0.6, 1.2, tn), S });
+          }
+          // 来电：同一帧原样回来，并标明"毫发无损"
+          const ra = smoothstep(tOn + 0.15, tOn + 0.5, T) * (1 - smoothstep(cue('candle_return') - 0.6, cue('candle_return') - 0.15, T));
+          if (ra > 0.001) {
+            right(gg, typed(LABELS.power.on, T - tOn - 0.15, 22), X, 186 * S, { size: 13, alpha: 0.9 * ra * a, S, spacing: 0.12, weight: 400 });
+            right(gg, LABELS.power.onEn, X, 206 * S, { size: 9, alpha: 0.45 * ra * a, S });
+          }
+        } else {
+          right(gg, LABELS.copies.sync, X, 132 * S, { size: 13, alpha: 0.7 * a, S, spacing: 0.12 });
+          right(gg, LABELS.copies.syncEn, X, 152 * S, { size: 9, alpha: 0.4 * a, S });
         }
       };
-      const gl = glitchAmt(T);
-      if (gl >= 1) return drawDesync(g, f);
       overlay.withGlitch(g, gl, (f.frame * 7919) % 100000, W, H, drawCounter);
     }
-    drawDesync(g, f);
+    // S16：安装日志 + 失步框（同一次故障里一起消散）
+    drawOriginHud(g, f, gl);
+    // S17：分类表最后一次出现
+    if (T >= cue('verdict_label')) drawVerdict(g, f, T, hud.verdictAnchor, false);
   }
   function glitchAmt(T) {
     const t = T - cue('hud_glitch');
     if (t < 0) return 0;
     return clamp(0.25 + t * 0.9 + 0.3 * Math.sin(t * 40) * Math.sin(t * 13));
   }
-  function drawDesync(g, f) {
-    const { T, origTop, origBot } = hud;
+  const installT = () => [cue('install_1'), cue('install_2'), cue('install_3')];
+  function drawOriginHud(g, f, gl) {
+    const { T, origTop, origBot, origSide } = hud;
     const S = f.S, W = ctx.W, H = ctx.H;
-    const t0 = cue('desync_start') + 0.35, tg = cue('hud_glitch');
-    if (T < t0 || T > tg + 1.6) return;
-    const gl = glitchAmt(T);
+    const it = installT();
+    const tg = cue('hud_glitch');
+    if (T < it[0] - 0.8 || T > tg + 1.6 || !origTop) return;
     const dissolve = 1 - smoothstep(tg + 0.6, tg + 1.5, T);
     if (dissolve <= 0) return;
-    const delta = 0.003 * Math.exp((T - cue('desync_start')) * 1.25);
-    const x = (origTop[0] + origBot[0]) / 2, y0 = (origTop[1] + origBot[1]) / 2 + 20 * S;
-    const bh = Math.min(Math.abs(origBot[1] - origTop[1]) * 1.06, H - 60 * S), bw = bh * 0.42;
-    const y = y0;
     const draw = (gg) => {
-      overlay.hudBracket(gg, { x, y: y - 20 * S, w: bw, h: bh, t: T - t0, alpha: dissolve, S, color: overlay.COLORS.hudWarn, corner: 16 });
-      if (T - t0 > 0.35) {
-        const lx = x + bw / 2 + 12 * S, ly = Math.max(y - 20 * S - bh / 2, 30 * S);
-        overlay.hudText(gg, LABELS.desync.name(delta.toFixed(3)), lx, ly + 14 * S, { size: 14, alpha: 0.95 * dissolve, S, color: overlay.COLORS.hudWarn, weight: 400, spacing: 0.1 });
-        overlay.hudText(gg, LABELS.desync.fact, lx, ly + 36 * S, { size: 12, alpha: 0.8 * dissolve, S, color: overlay.COLORS.hudWarn, spacing: 0.1 });
-        overlay.hudText(gg, LABELS.desync.en, lx, ly + 54 * S, { size: 9, alpha: 0.45 * dissolve, S, color: overlay.COLORS.hudWarn });
+      // 安装日志：每一样都是一件可以失去的东西
+      const lines = [];
+      LABELS.install.forEach((l, k) => {
+        lines.push({ text: `${l.add}  ${l.loss}`, at: it[k] - it[0] + 0.75, size: 13.5 });
+        lines.push({ text: l.en, en: true, size: 9 });
+      });
+      overlay.hudCallout(gg, { anchor: origSide, dir: [1, 0.1], len: 70, t: T - it[0] + 0.75, alpha: 0.92 * dissolve, S, lines, charRate: 26 });
+      // 失步：红色取景框
+      const t0 = cue('desync_start');
+      if (T >= t0) {
+        const delta = 0.003 * Math.exp((T - t0) * 1.25);
+        const x = (origTop[0] + origBot[0]) / 2;
+        const bh = Math.min(Math.abs(origBot[1] - origTop[1]) * 1.06, H - 60 * S), bw = bh * 0.42;
+        const y = (origTop[1] + origBot[1]) / 2;
+        overlay.hudBracket(gg, { x, y, w: bw, h: bh, t: T - t0, alpha: dissolve, S, color: overlay.COLORS.hudWarn, corner: 16 });
+        if (T - t0 > 0.3) {
+          const lx = x + bw / 2 + 14 * S, ly = Math.max(y - bh / 2, 30 * S);
+          const tt = T - t0 - 0.3;
+          overlay.hudText(gg, typed(LABELS.desync.name(delta.toFixed(3)), tt, 40), lx, ly + 16 * S, { size: 14, alpha: 0.95 * dissolve, S, color: overlay.COLORS.hudWarn, weight: 400, spacing: 0.1 });
+          overlay.hudText(gg, typed(LABELS.desync.fact, tt - 0.3, 22), lx, ly + 42 * S, { size: 12.5, alpha: 0.85 * dissolve, S, color: overlay.COLORS.hudWarn, weight: 400, spacing: 0.1 });
+          overlay.hudText(gg, LABELS.desync.en, lx, ly + 62 * S, { size: 9, alpha: 0.45 * dissolve * smoothstep(0.8, 1.2, tt), S, color: overlay.COLORS.hudWarn });
+        }
       }
     };
     overlay.withGlitch(g, gl, (f.frame * 104729) % 100000 + 7, W, H, draw);
+  }
+  // 分类表：未分类 / 思考：也许 / 会失去自己：▍
+  // 第二栏打到冒号为止，恰好在 verdict_cursor 时刻；之后只剩光标在闪（切黑后也在原处闪）
+  function drawVerdict(g, f, T, anchor, cursorOnly) {
+    if (!anchor) return;
+    const tv = cue('verdict_label');
+    const F = LABELS.fields;
+    const chars = LABELS.verdict.name.length + `${F.think}：${LABELS.verdict.think}`.length + `${F.lose}：`.length;
+    const rate = chars / Math.max(0.5, cue('verdict_cursor') - tv - 0.75 - 0.24);
+    overlay.hudClassify(g, {
+      name: LABELS.verdict.name, en: LABELS.verdict.en, think: LABELS.verdict.think, lose: '', fields: F,
+      anchor, dir: [1, -0.42], len: 64, t: T - tv, alpha: 0.95, S: f.S, charRate: rate, cursorOnly,
+    });
   }
 
   return {

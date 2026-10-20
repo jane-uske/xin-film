@@ -187,12 +187,12 @@ export default async function create(ctx) {
   scene.add(debris);
 
   // spherical camera around the brain centre (local coords)
-  const orbit = (az, el, D, look = BRAIN_C) => ({ p: [BRAIN_C[0] + D * Math.cos(el) * Math.sin(az), BRAIN_C[1] + D * Math.sin(el), BRAIN_C[2] + D * Math.cos(el) * Math.cos(az)], l: look, u: [0, 1, 0], fov: 30 });
+  const orbit = (az, el, D, look = BRAIN_C, side = 0) => ({ p: [BRAIN_C[0] + D * Math.cos(el) * Math.sin(az), BRAIN_C[1] + D * Math.sin(el), BRAIN_C[2] + D * Math.cos(el) * Math.cos(az)], l: [look[0] + Math.cos(az) * side, look[1], look[2] - Math.sin(az) * side], u: [0, 1, 0], fov: 30 });
   const DIVE_END = { p: [0.0, 1.3, 1.05], l: [0, 0.0, -0.08], u: [0, 1, 0], fov: 30 };
-  const BRAIN_A = orbit(0.30, 0.26, 3.2);
+  const BRAIN_A = orbit(0.30, 0.26, 3.2, BRAIN_C, 0.42);
   const brainOrbit = (T) => {
     const k = ease.inOutSine(invLerp(cue.brainHud + 0.3, cue.snap, T));
-    return orbit(lerp(0.30, 0.62, k), lerp(0.26, 0.34, k), lerp(3.2, 2.95, k));
+    return orbit(lerp(0.30, 0.62, k), lerp(0.26, 0.34, k), lerp(3.2, 2.95, k), BRAIN_C, 0.42);
   };
   function localCam(T) {
     if (T < cue.brain) {
@@ -264,12 +264,12 @@ export default async function create(ctx) {
     H0.l,
     [BCX - 4000, L.FLOOR, BCZ + 6000],
     [BCX + 8000, L.FLOOR + 6000, BCZ],
-    [BCX - 8000, L.FLOOR + 40000, BCZ],
-    [BCX - 24000, L.FLOOR + 92000, BCZ - 20000],
+    [BCX - 8000, L.FLOOR + 30000, BCZ],
+    [BCX - 18000, L.FLOOR + 52000, BCZ - 20000],
   ];
   function craneMM(T) {
     const u = invLerp(T_CR, cue.fade + 1, T);
-    const k = 1 - Math.pow(1 - u, 3);
+    const k = 1 - Math.pow(1 - u, 2.2);
     return { p: catmull(CR, k), l: catmull(CRL, k) };
   }
   function dcCamLocal(T) {
@@ -614,14 +614,14 @@ export default async function create(ctx) {
       // 2/3: the human brain (held into the snap so it can be read)
       if (T > cue.brainHud && T < cue.snap + 0.8) {
         const a = 1 - smoothstep(cue.snap + 0.25, cue.snap + 0.7, T);
-        const [x, y] = proj(toW([0.3, 1.18, 0.4]));
-        overlay.hudClassify(g, { ...LABELS.brain, fields: F, anchor: [x, y], dir: [1, -0.62], len: 130, t: T - cue.brainHud, alpha: a, S, charRate: 120 });
+        const [x, y] = proj(toW([0.5, 1.05, 0.35]));
+        overlay.hudClassify(g, { ...LABELS.brain, fields: F, anchor: [x, y], dir: [1, -0.75], len: 120, t: T - cue.brainHud, alpha: a, S, charRate: 120 });
       }
       // the chip — the same AI chip becomes the wick of the digital flame in Act II
       if (T > cue.gpuHud && T < cue.dcHud) {
         const a = 1 - smoothstep(cue.dcHud - 0.55, cue.dcHud - 0.1, T);
         const [x, y] = proj(toW([0.0, DIE_Y, 0.0]));
-        overlay.hudCallout(g, { anchor: [x, y], dir: [1, -0.5], len: 150, lines: [{ text: LABELS.gpu.name }, { text: LABELS.gpu.en, en: true }], t: T - cue.gpuHud, alpha: a, S, charRate: 60 });
+        overlay.hudCallout(g, { anchor: [x, y], dir: [-1, -0.5], len: 150, lines: [{ text: LABELS.gpu.name }, { text: LABELS.gpu.en, en: true }], t: T - cue.gpuHud, alpha: a, S, charRate: 60 });
       }
       // 3/3: the datacenter
       if (T > cue.dcHud && T < cue.fade + 0.1) {
