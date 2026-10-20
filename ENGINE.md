@@ -75,3 +75,4 @@ node tools/render.mjs --preview --from 30 --to 92         # 低清预览视频�
 ```
 
 浏览器预览：在 `film/` 下起静态服务（`npx serve .`），打开 `index.html?from=30`，实时播放（有 GPU 时）并带配乐。
+

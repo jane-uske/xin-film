@@ -358,3 +358,4 @@ export function buildNetwork(ctx, { earthR }) {
   points.frustumCulled = false;
   return { points, U, N, somata: NS };
 }
+

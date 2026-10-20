@@ -1,0 +1,4 @@
+numpy>=1.24,<3
+scipy>=1.10,<2
+# Optional for spectrogram/loudness PNGs: matplotlib>=3.7,<4
+# Without it, run audio/score.py --no-plots (numeric QA is always performed).

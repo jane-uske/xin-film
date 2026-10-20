@@ -1,40 +1,28 @@
-# 《芯》XIN — score & sound design (all code, no samples)
-Run: `python3 film/audio/score.py` (≈2.5 min on 4 cores) → `film/out/score.wav` (48 kHz/24-bit stereo, exactly
-`timeline.duration`), float stems in `out/stems/` (music, sfx, ambience) and QA in `out/qa/` (`report.txt`,
-`spectrogram.png`, `loudness.png`). All sync points come from `timeline.json` (`cues`, `cards`, `events`, the S03
-shot start); move a cue and re-run to re-sync. Deterministic: every random source is seeded by a stable label.
+# 《芯》XIN — 配乐与声音设计
 
-**Concept.** D Dorian. The leitmotif D → A → B♭ (a minor sixth: a question) belongs to the candle's piano. The machine
-answers in pure sines and a perfectly tuned choir. In Act III one choir voice drifts flat, slides a semitone down,
-grows vibrato and turns into the warm cello. The climax hangs on A7(♭9), with the cello gliding C♯→D, and is cut
-before it resolves. The epilogue turns the motif into D → A → E and rests on an unresolved sus2. Silence is
-structural: every required window is digital zero, reverb tails included.
+所有音色和音效由代码合成，不用采样或旁白。以 `timeline.json` 为唯一剪辑时间来源，当前版本长 227 秒。
 
-**Instruments** (`instruments.py`, `fx.py`): sub drone; glass harmonica (beating sines); granular star shimmer;
-additive piano (inharmonic partials, two-stage decay, unison detune, hammer); bowed cello (band-limited additive
-Helmholtz saw, bow noise, body resonances); PolyBLEP string section (dark/bright cross-fade, body EQ); formant
-choir (zero vibrato); bell; arp plucks; brass pad; sine chimes. FX/foley: flame (hiss, flutter, wick crackle)
-and its digitised twin (the *same* signal, zero-order-hold + bit-crushed); datacenter hum (shaped fan noise,
-blade-pass tones, 50 Hz mains series, load-modulated coil whine); match strike; relay thunk; sub drop; impact;
-whooshes; reverse swells; suck-out; heartbeat; neural crackle; HUD blips and glitch; embers.
+```bash
+python3 -m pip install -r audio/requirements.txt
+python3 audio/score.py --validate  # 先检查 cue、事件顺序和静音区间
+python3 audio/score.py --no-plots  # 合成 + 母带 + 数值检查
+# 可选：安装 matplotlib 后，省略 --no-plots 即可生成图表
+```
 
-**Cue map.** `first_star` ting + 12 `astra_star_ignitions` pings in the accelerating shimmer · one tick per
-`astra_line_ticks` · glare whoosh in the hold · star pass-bys + reverse swell + riser into 20.0 · motif D-A-B♭ under
-the epigraph · `collapse_start`→`implode`: accelerating ostinato, swirling rumble, rising string glissandi ·
-`implode`: 0.36 s suck-out, then vacuum · `ignite`: sub drop 60→25 Hz, boom, bright burst, 11 s space reverb,
-full Dm(add9) · star: plasma roar, B♭maj9 → Csus2 · `pullback_start` whoosh · `earth_arrive` G/D (the Dorian B♮),
-`sunrise` glass · `brain_form` heartbeat + neural crackle + glass pulses · `silicon_snap` snap → 16th arpeggio,
-hum rising · cards thin the music (−2.5 dB + sparser writing) · `hum_cut` hard cut · `match_strike`/`flame_catch`
-· piano motif · `wax_drip` · digital twin in 5 resolutions with click-chime per `res_step_*` · piano phrase
-copied note-for-note by sines · seed chimes follow the seed's pan path; `seed_burn` "tss" + one silent beat ·
-`copy_2/4/8` stacked dings → exponential ding cascade into the unison choir · `power_off`/`power_on` gated
-silence, relay thunk, hum/choir/flames return phase-identical (they never stopped underneath) · `candle_return`
-· `desync_start` voice drift + flame delay drift, `hud_glitch`, `warm_shift` digital→real flame + cello morph,
-`self_burn_start` embers · `candle_reenter`: piano ↔ cello duet, accelerating heartbeat, `lean_start` gust,
-`bridge_start` violins + swell · `cut_black` hard cut · `stars_return` D-A-E on Dsus2, warm flame flickers
-multiplying · heart strokes in embers, two falling grass tones, `title_glow` low bell + piano D1/D2 bloom ·
-credits pad · `end_match_strike` + `end_flame_hiss`, faded by `end_fade`+0.5.
+输出：`out/score.wav`（48 kHz、24-bit、双声道）、`out/stems/`（music / sfx / ambience 浮点分轨）、`out/qa/report.txt`，以及检查通过后写出的 `out/score.meta.json`。元数据记录时间线原始字节 SHA-256、时长、采样率、音频采样帧数 `frames`、视频帧数 `videoFrames`、响度和真峰值，用于出片时校验。默认还生成频谱、响度图；`--no-plots` 仅跳过图表。
 
-**Mix/master.** FFT-convolution reverbs from synthesised IRs (room/hall/space), rendered per audible segment so no
-tail crosses a cut; decorrelated highs, mono lows. BS.1770-4 gated loudness → −16 LUFS; 4× oversampled look-ahead
-true-peak limiter (−1.3 dBTP); silence gates applied last.
+## 这版的声音走向
+
+- 开场与第一幕保留空间感、恒星、神经与机房声。34 秒点火有重量，但降低冲击、铜管与长混响的动态，留出后半段的空间。
+- 第二幕以烛火轻颤、稀疏钢琴和机器纯音为主。复制阵列保持冷静，不提前做一次高潮。
+- 136.8 / 138.3 / 139.8 秒的三次记录使用 D—A—B♭：从电子音，经过电子与钢琴的混合，转为钢琴，并在第三次留下前面音符的残响。一个副本开始积累自身经历。
+- 失步以后，合唱中的单声部变为带揉弦的大提琴。心跳从 141.8 秒开始，弦乐逐步加入，持续推到 172 秒硬切。全片的主要动态峰值留在这里。
+- 183.5 秒庄子题记对应 D—A—E，不作完全解决。片名与片尾回落，220 秒之后清空声音，224 秒只留一次划火柴。
+
+## 确定性与母带
+
+所有随机源使用稳定标签派生的种子。`dsp.py` 负责振荡器、滤波、噪声、声像和混响；`instruments.py` 负责钢琴、弦乐、合唱等；`fx.py` 负责烛火、数字火焰、机房、火柴与同步事件；`master.py` 负责测量、限幅与 WAV 写出。
+
+按可听区间分别做合成脉冲响应的 FFT 卷积，避免混响尾巴穿过切黑。BS.1770-4 门限响度目标为 −16 LUFS；4 倍过采样的前视限幅器上限为 −1.3 dBTP。实际测量写入报告。
+
+严格数字静音区间（左闭右开）：0–1、64–64.45、128–129.2、172–180.5、220–224 秒。最终从写出的 24-bit WAV 重新检查采样数及静音区间，失败则不生成新的元数据。分轨供再混音参考，最终母带另有高低切、低频单声道与限幅处理。

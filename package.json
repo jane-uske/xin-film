@@ -11,5 +11,11 @@
     "@fontsource/noto-serif-sc": "^5.2.5",
     "playwright": "^1.56.1",
     "three": "^0.186.1"
+  },
+  "scripts": {
+    "test": "node --test tools/cache.test.mjs && node tools/check.mjs",
+    "check": "node tools/check.mjs",
+    "render": "node tools/render.mjs",
+    "build": "node tools/build.mjs"
   }
 }

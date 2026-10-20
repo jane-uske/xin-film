@@ -56,6 +56,12 @@ export default async function create(ctx) {
   const tOff = cue('power_off'), tOn = cue('power_on');
   const Tmach = (T) => T - clamp(T - tOff, 0, tOn - tOff);
   const resSteps = [cue('res_step_1'), cue('res_step_2'), cue('res_step_3'), cue('res_step_4')];
+  const installs = [cue('install_1'), cue('install_2'), cue('install_3')];
+  const cut = cue('cut_black');
+  // Each installed capability leaves a small, lasting change before the visible loss of sync.
+  // This is a closed function of time: rendering a late frame alone gives the same accumulated history.
+  const installed = (T) => installs.reduce((sum, t) => sum + smoothstep(t + 0.25, t + 1.05, T), 0) / installs.length;
+  const warmth = (T) => lerp(0.24 * installed(T), 1, smoothstep(cue('warm_shift_start'), cue('warm_shift_end'), T));
   const digOn = cue('track_right') + 2.2;     // 数据之火被"点亮"（机器启动）
   const levelAt = (T) => { let l = 0; for (const s of resSteps) if (T >= s) l++; return l; };
   const LV = [
@@ -243,12 +249,31 @@ export default async function create(ctx) {
     return [p.x, p.y, p.z];
   })();
 
+  // The unanswered table follows its subject. After the cut, recompute its last visible position;
+  // never reuse a previous frame's HUD state (chunks and stills can start in complete darkness).
+  const verdictCamera = new THREE.PerspectiveCamera(FOV, ctx.W / ctx.H, 0.3, 40000);
+  function verdictAnchor(T) {
+    const t = Math.min(T, cut - 1 / ctx.fps);
+    const st = candleState(util, cue, t), dp = digPose(t, st);
+    setCamera(verdictCamera, t, st);
+    const [x, y] = ctx.project(V3(dp.x + 0.3, dp.wickY + 2.5, 0), verdictCamera);
+    return [clamp(x, ctx.W * 0.57, ctx.W * 0.69), clamp(y, ctx.H * 0.24, ctx.H * 0.43)];
+  }
+
   // ---------- 每帧 ----------
   const pxScale = () => ctx.H / (2 * Math.tan((camera.fov * D2R) / 2));
   let hud = {};
 
   function render(f) {
     const T = f.T, S = f.S;
+    if (T >= cut) {
+      ctx.renderer.setRenderTarget(f.target);
+      ctx.renderer.setClearColor(0x000000, 1);
+      ctx.renderer.clear(true, true, true);
+      hud = { T, cut: true };
+      // fade applies to the scene only. The cursor and the following question remain visible.
+      return { fade: 0, grain: 0, bloom: 0, streak: 0, ca: 0, vignette: 0 };
+    }
     const st = candleState(util, cue, T);
     const dp = digPose(T, st);
     applyCamera(T, st);
@@ -302,7 +327,7 @@ export default async function create(ctx) {
     const appear = smoothstep(digOn, digOn + 0.08, T);   // 一帧之内亮起
     const wake = smoothstep(digOn - 0.6, digOn - 0.1, T);  // 芯片先亮一个点
     const o = digital.orig.u;
-    const warm = smoothstep(cue('warm_shift_start'), cue('warm_shift_end'), T);
+    const warm = warmth(T);
     const soft = smoothstep(cue('warm_shift_start') + 1.0, cue('warm_shift_end') + 0.5, T);
     digital.origPts.forEach((p, k) => { p.visible = digVisible && k === lvl && appear > 0 && soft < 0.999; });
     const geoL = digital.levels[lvl];
@@ -411,6 +436,7 @@ export default async function create(ctx) {
 
     // ---- HUD 数据 ----
     hud = { T, Tm, n, powerOff, origScreen: ctx.project(V3(dp.x, dp.wickY + 1.6, 0), camera), lvl,
+      chipScreen: ctx.project(V3(dp.x, dp.top + DIG.chipH, 0), camera),
       origTop: ctx.project(V3(dp.x, dp.wickY + 3.15, 0), camera), origBot: ctx.project(V3(dp.x, dp.wickY - 0.15, 0), camera) };
 
     // ---- 调色 ----
@@ -508,6 +534,7 @@ export default async function create(ctx) {
     const { T, Tm, n, powerOff, origScreen, lvl } = hud;
     if (T === undefined) return;
     const S = f.S, W = ctx.W, H = ctx.H;
+    if (T >= cut) { drawVerdict(g, f); return; }
     if (powerOff) {
       // 全黑里只剩角落一行小字，让观众知道这是断电，不是黑屏
       const a = 0.85 * smoothstep(tOff, tOff + 0.12, T);
@@ -521,22 +548,25 @@ export default async function create(ctx) {
     if (T > s13a && T < s13b) {
       const a = util.envelope(T, s13a, s13a + 0.3, s13b - 0.8, s13b);
       const [N, NY] = DIG.levels[lvl];
-      const [x, y] = origScreen;
-      overlay.hudCallout(g, { anchor: [x + 70 * S, y - 10 * S], dir: [1, -0.55], len: 90, t: T - s13a, alpha: a * 0.85, S,
-        lines: [{ text: LABELS.model.name }, { text: LABELS.model.fit(lvl >= 4 ? '99.96' : ((0.62 + lvl * 0.09) * 100).toFixed(0)) },
+      const [x, y] = hud.chipScreen;
+      overlay.hudCallout(g, { anchor: [x, y], dir: [1, -1.1], len: 190, t: T - s13a, alpha: a * 0.85, S,
+        lines: [{ text: LABELS.chip.name }, { text: LABELS.model.name },
+          { text: LABELS.model.fit(lvl >= 4 ? '99.96' : ((0.62 + lvl * 0.09) * 100).toFixed(0)) },
           { text: LABELS.model.en(N, NY), en: true }] });
     }
     // S15–S16：实例计数
-    const c0 = cue('copy_2') - 0.6, c1 = cue('hud_glitch') + 1.4;
+    const c0 = cue('copy_2') - 0.6, c1 = cue('install_1');
     if (T > c0 && T < c1 && !(T > cue('candle_return') - 0.1 && T < cue('ch3_in') + 0.8)) {
       const k = Math.min(n, 20);
-      const a = smoothstep(c0, c0 + 0.4, T);
+      const a = smoothstep(c0, c0 + 0.4, T) * (1 - smoothstep(c1 - 0.7, c1, T));
       const drawCounter = (gg) => {
         overlay.hudText(gg, `${LABELS.copies.name}  ${LABELS.copies.en}`, W - 96 * S, 74 * S, { size: 10.5, alpha: 0.6 * a, S, align: 'right' });
         overlay.hudText(gg, fmtInt(2 ** k), W - 96 * S, 98 * S, { size: 19, alpha: 0.9 * a, S, align: 'right', weight: 300, spacing: 0.12 });
         gg.save(); gg.strokeStyle = overlay.rgba(overlay.COLORS.hud, 0.5 * a); gg.lineWidth = Math.max(1, S);
         gg.beginPath(); gg.moveTo(W - 96 * S, 82 * S); gg.lineTo(W - 96 * S - 150 * S, 82 * S); gg.stroke(); gg.restore();
         if (T > cue('ch3_in')) overlay.hudText(gg, LABELS.copies.sync, W - 96 * S, 122 * S, { size: 11, alpha: 0.6 * a, S, align: 'right', spacing: 0.12 });
+        const noteA = smoothstep(cue('copy_8') + 0.5, cue('copy_8') + 1.2, T) * (1 - smoothstep(tOff - 0.7, tOff, T));
+        if (noteA > 0.001) overlay.hudText(gg, LABELS.copies.note, W - 96 * S, 132 * S, { size: 13, alpha: 0.85 * a * noteA, S, align: 'right', weight: 400, spacing: 0.08 });
         // 来电：同一帧原样回来，并标明"毫发无损"
         const ra = smoothstep(tOn + 0.15, tOn + 0.5, T) * (1 - smoothstep(cue('candle_return') - 0.6, cue('candle_return') - 0.15, T));
         if (ra > 0.001 && T < cue('ch3_in')) {
@@ -544,11 +574,57 @@ export default async function create(ctx) {
           overlay.hudText(gg, LABELS.power.onEn, W - 96 * S, 142 * S, { size: 9, alpha: 0.45 * ra * a, S, align: 'right' });
         }
       };
-      const gl = glitchAmt(T);
-      if (gl >= 1) return drawDesync(g, f);
-      overlay.withGlitch(g, gl, (f.frame * 7919) % 100000, W, H, drawCounter);
+      drawCounter(g);
     }
+    drawInstall(g, f);
     drawDesync(g, f);
+    drawVerdict(g, f);
+  }
+
+  // Three capabilities, three traces. Keep the panel steady while the fire slowly changes beside it.
+  // Previously entered lines remain; this is the first time the machine has a visible personal history.
+  function drawInstall(g, f) {
+    const { T } = f;
+    const end = cue('hud_glitch') + 0.5;
+    if (T < installs[0] || T >= end) return;
+    const S = f.S, x = ctx.W * 0.59, y = ctx.H * 0.25;
+    const a = 1 - smoothstep(cue('desync_start') + 0.5, end, T);
+    const ink = overlay.COLORS.hud.map((v, i) => lerp(v, overlay.COLORS.paper[i], installed(T)));
+    const ax = clamp(hud.origScreen[0] + 55 * S, ctx.W * 0.20, ctx.W * 0.47);
+    const ay = clamp(hud.origScreen[1], ctx.H * 0.25, ctx.H * 0.58);
+    const line = ease.outCubic(invLerp(installs[0], installs[0] + 0.45, T));
+    g.save();
+    g.lineWidth = Math.max(S, 1);
+    g.strokeStyle = overlay.rgba(ink, a * 0.32);
+    g.beginPath(); g.moveTo(ax, ay); g.lineTo(lerp(ax, x - 20 * S, line), lerp(ay, y - 10 * S, line)); g.stroke();
+    g.restore();
+    LABELS.install.forEach((entry, i) => {
+      const t = T - installs[i];
+      if (t < 0) return;
+      const text = `${entry.add}  ${entry.loss}`;
+      const count = Math.min(text.length, Math.floor(t * 27));
+      const typed = text.slice(0, count) + (count < text.length ? '▍' : '');
+      const settling = smoothstep(installs[i], installs[i] + 0.18, T);
+      overlay.hudText(g, typed, x, y + i * 58 * S, { size: 14.5, alpha: a * settling * 0.92, S, color: ink, weight: 400, spacing: 0.07 });
+    });
+  }
+
+  function drawVerdict(g, f) {
+    const T = f.T, start = cue('verdict_label'), cursor = cue('verdict_cursor');
+    if (T < start || T >= cue('cursor_end')) return;
+    // Match the final character to the cursor cue. The same drawing routine and anchor are used
+    // on both sides of the cut, so the unanswered position does not jump when everything else goes.
+    const chars = LABELS.verdict.name.length
+      + `${LABELS.fields.think}：${LABELS.verdict.think}`.length
+      + `${LABELS.fields.lose}：`.length;
+    const rate = chars / (cursor - start - 0.75 - 0.24);
+    overlay.hudClassify(g, {
+      ...LABELS.verdict, en: undefined, lose: '', fields: LABELS.fields,
+      anchor: verdictAnchor(T), dir: [1, -0.45], len: 125,
+      t: T - start, charRate: rate, blinkT: Math.max(0, T - cursor),
+      cursorOnly: T >= cut, alpha: 0.94, S: f.S,
+      color: overlay.COLORS.paper,
+    });
   }
   function glitchAmt(T) {
     const t = T - cue('hud_glitch');
@@ -570,7 +646,7 @@ export default async function create(ctx) {
     const draw = (gg) => {
       overlay.hudBracket(gg, { x, y: y - 20 * S, w: bw, h: bh, t: T - t0, alpha: dissolve, S, color: overlay.COLORS.hudWarn, corner: 16 });
       if (T - t0 > 0.35) {
-        const lx = x + bw / 2 + 12 * S, ly = Math.max(y - 20 * S - bh / 2, 30 * S);
+        const lx = W * 0.59, ly = H * 0.56;
         overlay.hudText(gg, LABELS.desync.name(delta.toFixed(3)), lx, ly + 14 * S, { size: 14, alpha: 0.95 * dissolve, S, color: overlay.COLORS.hudWarn, weight: 400, spacing: 0.1 });
         overlay.hudText(gg, LABELS.desync.fact, lx, ly + 36 * S, { size: 12, alpha: 0.8 * dissolve, S, color: overlay.COLORS.hudWarn, spacing: 0.1 });
         overlay.hudText(gg, LABELS.desync.en, lx, ly + 54 * S, { size: 9, alpha: 0.45 * dissolve, S, color: overlay.COLORS.hudWarn });
@@ -588,3 +664,4 @@ export default async function create(ctx) {
     },
   };
 }
+

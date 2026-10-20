@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """XIN -- complete synthesised score + sound design.
 
-    python3 /home/user/utanote/film/audio/score.py
+    python3 audio/score.py [--validate] [--no-plots]
 
 Reads every sync point from film/timeline.json (cues, cards, events) and writes
 film/out/score.wav (48 kHz / 24-bit / stereo, exactly timeline.duration long),
@@ -12,6 +12,8 @@ import json
 import os
 import sys
 import time
+import ast
+import hashlib
 
 import numpy as np
 
@@ -125,6 +127,63 @@ def Alin(n, t0, pts):
     return env_pts(n, [(t - t0, v) for t, v in pts])
 
 
+def timeline_layout(tl):
+    """Audible groups also bound every reverb tail; silence is applied again last."""
+    C, D = tl['cues'], float(tl['duration'])
+    windows = [(0.0, C['silence_end']),
+               (C['hum_cut'], C['match_strike'] - 0.05),
+               (C['power_off'], C['power_on']),
+               (C['cut_black'], C['stars_return'] - 0.5),
+               (C['session_log_in'], C['end_match_strike']),
+               (C['end_fade'] + 0.5, D)]
+    groups = [(C['silence_end'], C['hum_cut']),
+              (C['match_strike'] - 0.05, C['cut_black']),
+              (C['stars_return'] - 0.5, C['session_log_in']),
+              (C['end_match_strike'], D)]
+    return windows, groups
+
+
+def validate_timeline(tl):
+    """Catch stale cue names and invalid edit order before allocating audio buses."""
+    C, D = tl['cues'], float(tl['duration'])
+    if not np.isfinite(D) or D <= 0 or tl['fps'] <= 0:
+        raise ValueError('duration and fps must be positive')
+    tree = ast.parse(open(__file__, encoding='utf-8').read())
+    refs = {n.slice.value for n in ast.walk(tree)
+            if isinstance(n, ast.Subscript) and isinstance(n.value, ast.Name)
+            and n.value.id == 'C' and isinstance(n.slice, ast.Constant)
+            and isinstance(n.slice.value, str)}
+    missing = refs - C.keys()
+    if missing:
+        raise ValueError(f'missing audio cues: {sorted(missing)}')
+    for key, value in C.items():
+        if not np.isfinite(value) or not 0 <= value <= D:
+            raise ValueError(f'cue {key} outside film: {value}')
+    orders = [
+        ('astra_release', 'drift_start', 'collapse_start', 'implode', 'ignite',
+         'star_hud_2', 'pullback_start', 'earth_arrive', 'city_dive', 'brain_form',
+         'silicon_snap', 'datacenter_reveal', 'spark_rise', 'act1_fade', 'hum_cut'),
+        ('match_strike', 'flame_catch', 'wax_drip', 'track_right', 'res_step_1',
+         'res_step_2', 'res_step_3', 'res_step_4', 'seed_enter', 'seed_through_digital',
+         'seed_burn', 'copy_2', 'copy_4', 'copy_8', 'copy_cascade_start',
+         'copy_cascade_end', 'power_off', 'power_on', 'candle_return'),
+        ('ch3_in', 'install_1', 'install_2', 'install_3', 'desync_start',
+         'warm_shift_start', 'warm_shift_end', 'lattice_fade', 'candle_reenter',
+         'lean_start', 'bridge_start', 'cut_black', 'stars_return', 'zhuangzi_in',
+         'zhuangzi_dissolve', 'title_xin_heart_start', 'title_glow', 'credits_in',
+         'credits_out', 'session_log_in', 'session_log_out', 'end_match_strike', 'end_fade'),
+    ]
+    for order in orders:
+        if any(C[a] >= C[b] for a, b in zip(order, order[1:])):
+            raise ValueError(f'audio cues out of order: {order}')
+    for a, b in sum(timeline_layout(tl), []):
+        if not 0 <= a <= b <= D:
+            raise ValueError(f'audio interval outside film: {(a, b)}')
+    if not tl['events'].get('power_sag') or any(not 0 <= v <= 1 for v in tl['events']['power_sag']):
+        raise ValueError('power_sag must contain gain values between 0 and 1')
+    return timeline_layout(tl)
+
+
 # =============================================================================
 # instrument helpers bound to the mixer
 # =============================================================================
@@ -201,17 +260,7 @@ def build(tl):
     C = tl['cues']
     E = tl.get('events', {})
     D = float(tl['duration'])
-    shots = {s['name']: s for s in tl['shots']}
-    windows = [(0.0, C['silence_end']),
-               (C['hum_cut'], C['match_strike'] - 0.05),
-               (C['power_off'], C['power_on']),
-               (C['cut_black'], C['stars_return'] - 0.5),
-               (C['credits_out'] + 1.5, C['end_match_strike']),
-               (C['end_fade'] + 0.5, D)]
-    groups = [(C['silence_end'], C['hum_cut']),
-              (C['match_strike'] - 0.05, C['cut_black']),
-              (C['stars_return'] - 0.5, C['credits_out'] + 1.5),
-              (C['end_match_strike'], min(D, C['end_fade'] + 0.5))]
+    windows, groups = validate_timeline(tl)
     mx = Mixer(D, groups)
     # automation of the strings bus (brightness and sends), absolute time
     s_bright, s_space = [(0.0, 0.25)], [(0.0, 0.45)]
@@ -221,7 +270,7 @@ def build(tl):
     # -------------------------------------------------------------------------
     log('prologue')
     t_on = C['silence_end']
-    LAND = shots['epigraph']['start']           # the riser lands here (20.0)
+    LAND = C['drift_start']
     REL = C['astra_release']
     COL = C['collapse_start']
     ign = E.get('astra_star_ignitions', [C['first_star']])
@@ -239,7 +288,7 @@ def build(tl):
     drone = lp(drone, 260.0, 2)
     drone *= Adb(n, t_on, [(t_on, -110), (C['first_star'], -54), (C['astra_lines_start'], -40),
                            (C['astra_hold_start'], -33), (REL, -29), (LAND - 0.05, -15), (LAND + 0.6, -19),
-                           (C['epigraph_dissolve'], -24), (COL, -22), (COL + 2.0, -30), (t1, -110)])
+                           (COL - 1.0, -24), (COL, -22), (COL + 2.0, -30), (t1, -110)])
     mx.add('music', t_on, drone, 0.0, 0.0, {'space': 0.08})
     # one thread of high glass
     n = ns(LAND + 1.5 - 1.5)
@@ -300,16 +349,13 @@ def build(tl):
     mx.add('sfx', REL + 0.9, X.whoosh(2.4, 'flythru', peak=0.58, f_lo=160, f_hi=2600, width_oct=1.4,
                                       pan_from=-0.2, pan_to=0.2), -21.0, sends={'space': 0.3})
 
-    # epigraph: first statement of the motif D - A - Bb, bowed fifth beneath
-    pno(mx, LAND, 'D2', 0.55, ring=9.0, gain=-7.0, sends={'hall': 0.25, 'space': 0.35})
-    pno(mx, LAND, 'D3', 0.5, ring=7.0, gain=-9.0, sends={'hall': 0.25, 'space': 0.35})
-    pno(mx, LAND + 2.0, 'A3', 0.46, ring=6.5, gain=-8.0, sends={'hall': 0.25, 'space': 0.35})
-    pno(mx, LAND + 4.3, 'Bb3', 0.5, ring=8.0, gain=-7.5, sends={'hall': 0.25, 'space': 0.4})
+    # Four seconds of drift. The question motif belongs to the candle later.
+    pno(mx, LAND, 'D3', 0.34, ring=4.0, gain=-18.0, sends={'hall': 0.25, 'space': 0.25})
     for nt, p in (('D2', -0.15), ('A2', 0.15), ('D3', 0.0)):
         strings(mx, nt, LAND, COL - 0.3, att=2.5, rel=2.0, gain=-27.0, p=p, label='epi')
     s_bright += [(LAND, 0.2), (COL - 0.5, 0.2)]
-    # embers rising as the text dissolves
-    ed = C['epigraph_dissolve']
+    # Small embers carry the camera into the disk; no opening epigraph in v2.
+    ed = COL - 1.0
     mx.add('sfx', ed, X.ember_stroke(COL - ed + 0.5, 'dissolve', 0.15), -31.0, sends={'space': 0.45})
     grain_cloud(mx, 'music', ed, COL + 0.5, lambda t: 6.0, ['A5', 'D6', 'E6', 'A6'], 'embers',
                 (0.03, 0.12), (-44, -37), 0.6, {'space': 0.6})
@@ -345,16 +391,19 @@ def build(tl):
     n = ns(IMP + 0.1 - COL)
     rum = X.rumble(n, 'collapse', lambda t: 55.0 * (500.0 / 55.0) ** np.clip(t / (IMP - COL), 0, 1) ** 1.5,
                    lambda t: 0.08 + 1.3 * (t / (IMP - COL)) ** 2)
-    rum *= Adb(n, COL, [(COL, -110), (C['ch1_out'], -40), (COL + 10, -28), (IMP - 0.05, -15), (IMP + 0.1, -110)])
+    collapse_span = IMP - COL
+    rum *= Adb(n, COL, [(COL, -110), (COL + collapse_span * 0.3, -40),
+                       (COL + collapse_span * 0.7, -32), (IMP - 0.05, -24), (IMP + 0.1, -110)])
     mx.add('ambience', COL, rum, 0.0, sends={'hall': 0.15})
     # low string pad crescendo, heat brightening (dark red -> white)
     pend = IMP + 0.3
     envL = [(COL + 0.5, -110), (COL + 4.0, -30), (IMP - 0.4, -12), (IMP + 0.3, -110)]
     strings(mx, 'D2', COL + 0.5, pend, env=envL, gain=-16.0, p=-0.1, label='colD')
     strings(mx, 'A2', COL + 0.5, pend, env=envL, gain=-18.0, p=0.1, label='colA')
-    strings(mx, 'D3', COL + 7.0, pend, env=[(COL + 7.0, -110), (COL + 10, -26), (IMP - 0.4, -12), (IMP + 0.3, -110)],
+    mid_start, late_start = COL + collapse_span * 0.5, COL + collapse_span * 0.7
+    strings(mx, 'D3', mid_start, pend, env=[(mid_start, -110), (COL + collapse_span * 0.7, -30), (IMP - 0.4, -20), (pend, -110)],
             gain=-19.0, p=-0.3, label='colD3')
-    strings(mx, 'Bb2', COL + 9.5, pend, env=[(COL + 9.5, -110), (COL + 12, -28), (IMP - 0.4, -14), (IMP + 0.3, -110)],
+    strings(mx, 'Bb2', late_start, pend, env=[(late_start, -110), (COL + collapse_span * 0.82, -32), (IMP - 0.4, -23), (pend, -110)],
             gain=-20.0, p=0.3, label='colBb')
     # tension: high strings glissando upward (accelerating)
     r0 = COL + 6.0
@@ -370,21 +419,21 @@ def build(tl):
     mx.automate(['music', 'ambience'], [(IMP, 0), (IMP + 0.08, -6), (IMP + 0.33, -75), (IGN - 0.002, -75), (IGN, 0)])
     mx.automate(['sfx'], [(IMP + 0.34, 0), (IMP + 0.38, -60), (IGN - 0.002, -60), (IGN, 0)])
 
-    # IGNITION: the one Hollywood moment
-    mx.add('sfx', IGN, X.sub_drop(7.5, 'ign'), -19.0)
-    mx.add('sfx', IGN, X.boom(1.6, 'ign'), -15.0, sends={'hall': 0.15})
-    mx.add('sfx', IGN, X.impact_burst(5.0, 'ign'), -13.5, sends={'space': 0.7, 'hall': 0.2})
+    # Ignition is a change of scale, not the film's emotional climax.
+    mx.add('sfx', IGN, X.sub_drop(4.0, 'ign'), -28.0)
+    mx.add('sfx', IGN, X.boom(1.1, 'ign'), -25.0, sends={'hall': 0.1})
+    mx.add('sfx', IGN, X.impact_burst(2.4, 'ign'), -26.0, sends={'space': 0.3, 'hall': 0.15})
     mx.add('sfx', IGN + 0.05, X.whoosh(2.4, 'shock', peak=0.22, f_lo=300, f_hi=6500, width_oct=1.3,
-                                       pan_from=-0.9, pan_to=0.9, attack_pow=0.7), -16.0, sends={'space': 0.4})
+                                       pan_from=-0.9, pan_to=0.9, attack_pow=0.7), -26.0, sends={'space': 0.25})
     full = ['D2', 'A2', 'D3', 'F3', 'A3', 'E4', 'A4', 'D5', 'E5', 'A5']
-    sp = [(IGN, -110), (IGN + 0.06, -3.5), (IGN + 1.0, -7), (IGN + 2.5, -10), (IGN + 5.0, -9), (C['star_hud_2'] - 0.3, -10),
+    sp = [(IGN, -110), (IGN + 0.16, -13), (IGN + 1.0, -15), (IGN + 2.0, -17), (C['star_hud_2'] - 0.3, -18),
           (C['star_hud_2'] + 1.5, -110)]
-    chord(mx, full, IGN, C['star_hud_2'] + 1.5, gain=-3.0, env=sp, label='ign')
+    chord(mx, full, IGN, C['star_hud_2'] + 1.5, gain=-10.0, env=sp, label='ign')
     n = ns(12.0)
     oc = np.interp(tvec(n), [0, 0.1, 3, 12], [0.2, 1.0, 0.35, 0.15])
     br = I.brass_pad(['D2', 'A2', 'D3', 'F3', 'A3'], n, 'ign', oc)
     br *= Adb(n, IGN, [(IGN, -110), (IGN + 0.05, 0), (IGN + 3, -10), (IGN + 9, -13), (IGN + 12, -110)])
-    mx.add('music', IGN, widen(br, 'brass', 0.5), -15.0, sends={'hall': 0.3, 'space': 0.35})
+    mx.add('music', IGN, widen(br, 'brass', 0.5), -24.0, sends={'hall': 0.3, 'space': 0.2})
     n = ns(9.0)
     gl_ = I.glass('A6', n, 'ign1', beat=0.5) + I.glass('D7', n, 'ign2', beat=0.35)
     gl_ *= Adb(n, IGN, [(IGN, -110), (IGN + 0.03, -30), (IGN + 3, -38), (IGN + 9, -110)])
@@ -458,7 +507,8 @@ def build(tl):
     roots = ['D2', 'Bb1', 'C2', 'D2', 'Bb1', 'C2', 'D2', 'D2']
     patt = [0, 2, 4, 5, 7, 5, 4, 2, 1, 3, 5, 6, 8, 6, 5, 3]
     AF = C['act1_fade']
-    c1i, c1o = C['card_c1_in'], C['card_c1_out']
+    # The old explanatory card is gone: thin the arpeggio as one spark rises.
+    thin_start = C['spark_rise']
     arp_onsets = []
     k = 0
     t = SS
@@ -467,19 +517,19 @@ def build(tl):
         tones = bars[min(bar, len(bars) - 1)]
         ext = [midi(x) for x in tones] + [midi(x) + 12 for x in tones]
         idx = patt[k % 16]
-        x = np.clip((t - SS) / (c1i - SS), 0, 1)
-        in_card = c1i - 0.3 <= t
-        if in_card and idx >= 5:
+        x = np.clip((t - SS) / (thin_start - SS), 0, 1)
+        thinning = thin_start <= t
+        if thinning and idx >= 5:
             idx -= 5
         m = ext[idx]
-        bright = 0.15 + 0.75 * x if not in_card else 0.35
+        bright = 0.15 + 0.55 * x if not thinning else 0.25
         acc = 1.0 if k % 4 == 0 else 0.75
         g = -23.0 + 6.0 * x
-        if in_card:
-            g = -27.0 - 9.0 * np.clip((t - (c1o - 2.0)) / (AF - (c1o - 2.0)), 0, 1) ** 1.5
+        if thinning:
+            g = -27.0 - 12.0 * np.clip((t - thin_start) / (AF - thin_start), 0, 1) ** 1.5
         y = I.pluck(m, 0.6, bright, f'arp{k}')
         mx.add('music', t, y * acc, g, 0.32 if k % 2 else -0.32, {'hall': 0.3})
-        if C['datacenter_reveal'] <= t < c1i - 0.3 and k % 2 == 0:
+        if C['datacenter_reveal'] <= t < thin_start and k % 2 == 0:
             y2 = I.pluck(m + 12, 0.35, 0.5, f'arq{k}')
             mx.add('music', t, y2, g - 9.0, -0.6 if k % 4 else 0.6, {'hall': 0.4})
         arp_onsets.append(t)
@@ -487,7 +537,7 @@ def build(tl):
             rt = midi(roots[min(bar, len(roots) - 1)])
             yb = I.pluck(rt, 0.4, 0.15, f'bass{k}', pw_odd=0.2)
             yb += 0.6 * np.sin(TAU * hz(rt) * tvec(len(yb))) * np.exp(-tvec(len(yb)) / 0.18)
-            gb = -15.0 if not in_card else -22.0 - 8 * np.clip((t - (c1o - 2.0)) / (AF - (c1o - 2.0)), 0, 1)
+            gb = -20.0 if not thinning else -26.0 - 10 * np.clip((t - thin_start) / (AF - thin_start), 0, 1)
             mx.add('music', t, yb, gb, 0.0, {'hall': 0.1})
         k += 1
         t = SS + k * sixteenth
@@ -508,8 +558,8 @@ def build(tl):
     load = 0.35 + 0.65 * np.clip(load, 0, 1)
     coil = X.coil_whine(n, ha, 'dcA', load)
     DR = C['datacenter_reveal']
-    fans *= Adb(n, ha, [(ha, -110), (SS, -48), (DR, -30), (c1i, -22), (HC, -18)])
-    mains_e = Adb(n, ha, [(ha, -110), (SS, -48), (DR, -28), (c1i, -23), (HC, -19)])
+    fans *= Adb(n, ha, [(ha, -110), (SS, -48), (DR, -34), (thin_start, -32), (HC, -40)])
+    mains_e = Adb(n, ha, [(ha, -110), (SS, -48), (DR, -33), (thin_start, -34), (HC, -42)])
     coil *= Adb(n, ha, [(ha, -110), (SS + 2, -52), (DR, -44), (HC, -38)])
     hum = fans + pan(mains * mains_e, 0.0) + pan(coil, 0.15)
     mx.add('ambience', ha, hum, 0.0, sends={'hall': 0.12})
@@ -667,6 +717,18 @@ def build(tl):
     # ACT III - MIND
     # -------------------------------------------------------------------------
     log('act III')
+    # Three retained experiences. Each adds more of the candle's piano to the
+    # machine's pure tone; the final note keeps a little of the first two.
+    for k, (key, nt) in enumerate((('install_1', 'D4'), ('install_2', 'A4'), ('install_3', 'Bb4'))):
+        t = C[key]
+        electronic = (1.0, 0.48, 0.12)[k]
+        mx.add('music', t, I.chime(nt, 3.8, f'install{k}', bright=0.08, decay=1.5) * electronic,
+               -24.0, 0.08, {'hall': 0.18})
+        if k:
+            pno(mx, t + 0.025, nt, 0.24 + 0.09 * k, ring=5.0, gain=-18.0 + 2.0 * k,
+                p=0.08, sends={'hall': 0.25}, label='experience')
+        if k == 2:
+            pno(mx, t + 0.12, 'D3', 0.22, ring=6.0, gain=-23.0, p=0.08, label='memory')
     # the one voice that leaves the unison and becomes the cello
     v0 = ch3i - 0.5
     n = ns(CB - v0)
@@ -725,8 +787,8 @@ def build(tl):
     pno(mx, CRE + 0.3, 'D4', 0.4, ring=4.0, gain=-10.0, p=-0.5)
     pno(mx, CRE + 1.8, 'A4', 0.38, ring=4.0, gain=-10.5, p=-0.5)
     pno(mx, CRE + 3.2, 'Bb4', 0.42, ring=5.0, gain=-10.0, p=-0.5)
-    hb_start = CRE + 2.0
-    per0, per1 = 1.0, 0.41
+    hb_start = DS + 1.0
+    per0, per1 = 1.5, 0.49
     hper = lambda t: per0 * (per1 / per0) ** (np.clip((t - hb_start) / (CB - hb_start), 0, 1) ** 1.2)
     hbt = tempo_times(hb_start, CB - 0.05, hper)
     for k, t in enumerate(hbt):
@@ -734,11 +796,13 @@ def build(tl):
         gap = 0.27 * hper(t)
         for j, (dt, s) in enumerate(((0.0, 1.0), (gap, 0.6))):
             if t + dt < CB:
-                mx.add('music', t + dt, X.heartbeat_hit(f'hb3{k}{j}', s), -22.0 + 4.0 * x, 0.0, {'hall': 0.04})
-    prog = [(CRE, ['D3', 'A3', 'F4']), (LS, ['Bb2', 'F3', 'A3', 'D4']), (LS + 3.0, ['C3', 'G3', 'E4', 'D5']),
+                mx.add('music', t + dt, X.heartbeat_hit(f'hb3{k}{j}', s), -34.0 + 17.0 * x, 0.0, {'hall': 0.04})
+    prog = [(WS0 + 1.0, ['D3', 'A3']), (WS1, ['D3', 'A3', 'D4']),
+            (CRE, ['D3', 'A3', 'F4']), (LS, ['Bb2', 'F3', 'A3', 'D4']), (LS + 3.0, ['C3', 'G3', 'E4', 'D5']),
             (LS + 5.0, ['Bb2', 'G3', 'D4', 'F4']), (BS, ['A2', 'E3', 'D4', 'G4', 'A4']),
             (BS + 1.5, ['A2', 'E3', 'C#4', 'G4', 'Bb4', 'E5'])]
-    sgain = lambda t: float(np.interp(t, [CRE, LS, BS, CB], [-21.0, -17.5, -14.5, -11.5]))
+    sgain = lambda t: float(np.interp(t, [WS0 + 1.0, WS1, CRE, LS, BS, CB],
+                                    [-32.0, -27.0, -21.0, -17.5, -13.0, -10.0]))
     for i, (ts, notes) in enumerate(prog):
         te = prog[i + 1][0] if i + 1 < len(prog) else CB
         att = 2.0 if i == 0 else 0.5
@@ -798,12 +862,15 @@ def build(tl):
     pair = pair / (np.std(pair) * 4.0) * Adb(n, SRt, [(SRt, -110), (SRt + 2, -44), (SRt + 10, -46),
                                                        (C['title_xin_heart_start'], -110)])
     mx.add('ambience', SRt, np.stack([pair, np.roll(pair, ns(0.37))]) * 0.7, 0.0, sends={'hall': 0.2})
-    # the motif, transformed: D - A - E, resting on sus2 (never resolves)
-    pno(mx, SRt + 0.5, 'D4', 0.44, ring=8.0, gain=-10.0, sends={'hall': 0.3, 'space': 0.3})
-    pno(mx, SRt + 2.5, 'A4', 0.42, ring=8.0, gain=-10.5, sends={'hall': 0.3, 'space': 0.3})
-    pno(mx, SRt + 5.0, 'E5', 0.45, ring=10.0, gain=-10.0, sends={'hall': 0.3, 'space': 0.35})
-    pno(mx, SRt + 5.0, 'D3', 0.3, ring=10.0, gain=-14.0, sends={'hall': 0.3, 'space': 0.35})
-    pno(mx, SRt + 5.05, 'A3', 0.28, ring=10.0, gain=-15.0, sends={'hall': 0.3, 'space': 0.35})
+    # Zhuangzi now arrives after the question. D-A-E leaves it unresolved.
+    Z = C['zhuangzi_in']
+    pno(mx, Z, 'D4', 0.36, ring=8.0, gain=-14.0, sends={'hall': 0.3, 'space': 0.3})
+    pno(mx, Z + 2.0, 'A4', 0.34, ring=8.0, gain=-14.5, sends={'hall': 0.3, 'space': 0.3})
+    pno(mx, Z + 4.5, 'E5', 0.36, ring=10.0, gain=-14.0, sends={'hall': 0.3, 'space': 0.35})
+    pno(mx, Z + 4.5, 'D3', 0.25, ring=10.0, gain=-18.0, sends={'hall': 0.3, 'space': 0.35})
+    pno(mx, Z + 4.55, 'A3', 0.23, ring=10.0, gain=-19.0, sends={'hall': 0.3, 'space': 0.35})
+    mx.add('sfx', C['zhuangzi_dissolve'], X.ember_stroke(2.0, 'zhuangzi', 0.0),
+           -39.0, sends={'space': 0.3})
     for dt, nt in ((9.5, 'D5'), (11.0, 'A5'), (12.8, 'E6')):
         n = ns(5.0)
         gg = I.glass(nt, n, 'echo' + nt, beat=0.4) * Adb(n, 0, [(0, -110), (0.08, -33), (1.5, -40), (5.0, -110)])
@@ -853,6 +920,16 @@ def build(tl):
             continue
         mx.automate(['music'], [(a - 0.8, 0), (a, -2.5), (b, -2.5), (b + 0.8, 0)])
 
+    # One dynamic destination: the last seconds before cut_black. These broad
+    # balances are post-reverb, so the earlier cosmic/copy sequences stay small.
+    mx.automate(['music', 'sfx', 'ambience'], [
+        (0.0, -8), (COL, -9), (IGN - 0.8, -12), (IGN, -14),
+        (IGN + 1.5, -12), (PB, -10), (HC, -11), (FC, -5), (TR, -7),
+        (cas0, -9), (cas1, -12), (ch3i, -12), (C['install_3'], -10),
+        (DS, -9), (WS1, -5), (CRE, -4), (LS, -4.5), (BS, -6), (CB, -6),
+        (CB + 0.01, -11), (SRt, -11), (CO, -12), (EM, -8), (D, -8),
+    ])
+
     # -------------------------------------------------------------------------
     # process the strings and choir buses
     # -------------------------------------------------------------------------
@@ -898,8 +975,13 @@ def gate_mask(N, windows, fade_out=0.002, fade_in=0.0005):
 
 
 def main():
-    tl = json.load(open(os.path.join(FILM, 'timeline.json')))
+    timeline_bytes = open(os.path.join(FILM, 'timeline.json'), 'rb').read()
+    tl = json.loads(timeline_bytes)
     D = float(tl['duration'])
+    windows, _ = validate_timeline(tl)
+    if '--validate' in sys.argv[1:]:
+        print(f'Audio timeline valid: {D:g}s, {ns(D)} samples/ch, silence windows {windows}')
+        return
     os.makedirs(OUT, exist_ok=True)
     os.makedirs(os.path.join(OUT, 'stems'), exist_ok=True)
     os.makedirs(os.path.join(OUT, 'qa'), exist_ok=True)
@@ -964,12 +1046,17 @@ def main():
         M.write_wav_f32(os.path.join(OUT, 'stems', f'{s}.wav'), st)
         stem_lvls[s] = st
     log('QA')
-    # verify from the written file
+    # Verify from the written file, including sample-exact silence.
     xs, flat = M.read_wav24(os.path.join(OUT, 'score.wav'))
+    if xs.shape[1] != ns(D):
+        raise RuntimeError('written score duration does not match the timeline')
     report = []
     report.append(f'samples: {xs.shape[1]} (expected {ns(D)}), duration {xs.shape[1] / SR:.4f} s')
     xf = xs / 2 ** 23
-    report.append(f'integrated loudness: {M.integrated_lufs(xf):.2f} LUFS; true peak {M.true_peak_dbtp(xf):.2f} dBTP; '
+    written_lufs, written_tp = M.integrated_lufs(xf), M.true_peak_dbtp(xf)
+    if not np.isfinite(written_lufs) or abs(written_lufs - target) > 0.25 or written_tp > -1.0:
+        raise RuntimeError(f'master outside targets: {written_lufs:.2f} LUFS, {written_tp:.2f} dBTP')
+    report.append(f'integrated loudness: {written_lufs:.2f} LUFS; true peak {written_tp:.2f} dBTP; '
                   f'sample peak {20 * np.log10(np.abs(xf).max()):.2f} dBFS')
     report.append(f'DC offset L/R: {xf[0].mean():.2e} / {xf[1].mean():.2e}')
     report.append(f'full-scale samples: {int(np.sum(np.abs(xs) >= 2 ** 23 - 1))}')
@@ -980,6 +1067,8 @@ def main():
             continue
         nzc = int(np.count_nonzero(xs[:, ia:ib]))
         report.append(f'silence [{a:.3f}, {b:.3f}): {ib - ia} samples/ch, nonzero = {nzc}')
+        if nzc:
+            raise RuntimeError(f'nonzero samples in required silence [{a}, {b})')
     F = np.abs(np.fft.rfft(xf.mean(axis=0)[: 2 ** 23]))
     fr = np.fft.rfftfreq(2 ** 23, 1 / SR)
     report.append(f'energy above 20 kHz: {10 * np.log10((F[fr > 20000] ** 2).sum() / (F ** 2).sum()):.1f} dB re total')
@@ -987,8 +1076,14 @@ def main():
     cor = np.corrcoef(lo[0], lo[1])[0, 1]
     report.append(f'L/R correlation below 120 Hz: {cor:.3f}')
     tS, lS = M.loudness_curve(xf, 3.0)
-    for name, (a, b) in {'prologue': (0, 30), 'act I': (30, 92), 'act II': (92, 164), 'act III': (164, 202),
-                         'epilogue': (209.5, 248)}.items():
+    peak_i = int(np.argmax(lS))
+    report.append(f'loudest 3 s window: centered at {tS[peak_i]:.2f} s, {lS[peak_i]:.2f} LUFS')
+    C = tl['cues']
+    for name, (a, b) in {'prologue': (0, C['collapse_start']),
+                         'act I': (C['collapse_start'], C['hum_cut']),
+                         'act II': (C['hum_cut'], C['ch3_in'] - 0.5),
+                         'act III': (C['ch3_in'] - 0.5, C['cut_black']),
+                         'epilogue': (C['stars_return'] - 0.5, C['session_log_in'])}.items():
         m = (tS >= a) & (tS < b)
         report.append(f'short-term LUFS {name:9s}: max {lS[m].max():6.1f}, median {np.median(lS[m]):6.1f}')
     report.append('limiter gain reduction > 1 dB (250 ms bins): ' + (', '.join(gr_report) or 'none'))
@@ -996,9 +1091,22 @@ def main():
     txt = '\n'.join(report)
     print(txt)
     open(os.path.join(OUT, 'qa', 'report.txt'), 'w').write(txt + '\n')
-    M.qa_plots(xf, tl['cues'], windows, os.path.join(OUT, 'qa'), stems=stem_lvls)
+    if '--no-plots' in sys.argv[1:]:
+        log('QA plots skipped (--no-plots); numeric report and silence checks completed')
+    else:
+        M.qa_plots(xf, tl['cues'], windows, os.path.join(OUT, 'qa'), stems=stem_lvls)
+    metadata = {'timelineHash': hashlib.sha256(timeline_bytes).hexdigest(), 'duration': D,
+                'sampleRate': SR, 'frames': xs.shape[1], 'videoFrames': round(D * tl['fps']),
+                'channels': 2, 'bitsPerSample': 24, 'integratedLufs': float(written_lufs),
+                'truePeakDbtp': float(written_tp), 'silenceWindows': windows}
+    meta_path = os.path.join(OUT, 'score.meta.json')
+    with open(meta_path + '.tmp', 'w') as f:
+        json.dump(metadata, f, indent=2)
+        f.write('\n')
+    os.replace(meta_path + '.tmp', meta_path)
     log('done')
 
 
 if __name__ == '__main__':
     main()
+

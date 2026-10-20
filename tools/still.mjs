@@ -9,12 +9,17 @@ const tl = timeline();
 const scale = parseFloat(args.scale || '1');
 const outDir = path.resolve(ROOT, args.out || 'out/stills');
 fs.mkdirSync(outDir, { recursive: true });
-const port = parseInt(args.port || String(9300 + Math.floor(Math.random() * 600)), 10);
+const requestedPort = Number(args.port || 0);
 const times = args._.map((x) => { const s = tl.shots.find((sh) => sh.id === x); return s ? (s.start + s.end) / 2 : parseFloat(x); });
 
-const server = await startServer(port, async () => {});
+const server = await startServer(requestedPort, async () => {});
+const port = server.address().port;
+let browser;
+try {
 const W = Math.round(tl.width * scale), H = Math.round(tl.height * scale);
-const { browser, page } = await launch({ width: W, height: H });
+const launched = await launch({ width: W, height: H });
+browser = launched.browser;
+const page = launched.page;
 await openFilm(page, port, `render=1&scale=${scale}${args.query ? '&' + args.query : ''}`);
 for (const t of times) {
   const frame = Math.round(t * tl.fps);
@@ -25,5 +30,8 @@ for (const t of times) {
   await page.locator('#film').screenshot({ path: file });
   console.log(`${file}  (${ms} ms)`);
 }
-await browser.close();
-server.close();
+} finally {
+  if (browser) await browser.close().catch(() => {});
+  server.close();
+}
+

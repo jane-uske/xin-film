@@ -90,3 +90,4 @@ export function integrate(r, a, b, steps = 96) {
   for (let i = 1; i < steps; i++) s += r(a + i * h) * (i % 2 ? 4 : 2);
   return (s * h) / 3;
 }
+

@@ -551,6 +551,18 @@ export default async function create(ctx) {
     }`, { uPos: { value: new THREE.Vector2() }, uI: { value: 0 }, uAsp: { value: ctx.W / ctx.H }, uR: { value: 0.0045 }, uFl: { value: 1 } },
     { blending: THREE.AdditiveBlending, transparent: true });
 
+  // Keep the three classifications in one reading position. Only the leader follows the
+  // subject: a camera pull-out must not carry unfinished text below the frame.
+  function dockedHud(anchor, S) {
+    const shelf = [720 * S, 220 * S];
+    const safeAnchor = [
+      clamp(anchor[0], shelf[0] + 40 * S, ctx.W - 96 * S),
+      clamp(anchor[1], 96 * S, ctx.H - 96 * S),
+    ];
+    const dir = [shelf[0] - safeAnchor[0], shelf[1] - safeAnchor[1]];
+    return { anchor: safeAnchor, dir, len: Math.hypot(...dir) / S, align: 'left' };
+  }
+
   // ------------------------------------------------------------------ main
   return {
     msaa: 0,
@@ -609,26 +621,27 @@ export default async function create(ctx) {
         const a = 1 - smoothstep(cue.pull - 0.9, cue.pull - 0.15, T);
         const w = camR.clone().multiplyScalar(-0.66 * SUN_R).add(camU.clone().multiplyScalar(0.34 * SUN_R));
         const [x, y] = proj([w.x, w.y, w.z]);
-        overlay.hudClassify(g, { ...LABELS.sun, fields: F, anchor: [x, y], dir: [-1, -0.55], len: 150, t: T - cue.hud1, alpha: a, S, charRate: 55 });
+        overlay.hudClassify(g, { ...LABELS.sun, fields: F, ...dockedHud([x, y], S), t: (T - cue.hud1) * 1.35, alpha: a, S, charRate: 75 });
       }
       // 2/3: the human brain (held into the snap so it can be read)
       if (T > cue.brainHud && T < cue.snap + 0.8) {
         const a = 1 - smoothstep(cue.snap + 0.25, cue.snap + 0.7, T);
         const [x, y] = proj(toW([0.3, 1.18, 0.4]));
-        overlay.hudClassify(g, { ...LABELS.brain, fields: F, anchor: [x, y], dir: [1, -0.62], len: 130, t: T - cue.brainHud, alpha: a, S, charRate: 120 });
+        overlay.hudClassify(g, { ...LABELS.brain, fields: F, ...dockedHud([x, y], S), t: (T - cue.brainHud) * 1.35, alpha: a, S, charRate: 120 });
       }
       // the chip — the same AI chip becomes the wick of the digital flame in Act II
       if (T > cue.gpuHud && T < cue.dcHud) {
         const a = 1 - smoothstep(cue.dcHud - 0.55, cue.dcHud - 0.1, T);
         const [x, y] = proj(toW([0.0, DIE_Y, 0.0]));
-        overlay.hudCallout(g, { anchor: [x, y], dir: [1, -0.5], len: 150, lines: [{ text: LABELS.gpu.name }, { text: LABELS.gpu.en, en: true }], t: T - cue.gpuHud, alpha: a, S, charRate: 60 });
+        overlay.hudCallout(g, { ...dockedHud([x, y], S), lines: [{ text: LABELS.gpu.name }, { text: LABELS.gpu.en, en: true }], t: (T - cue.gpuHud) * 1.65, alpha: a, S, charRate: 75 });
       }
       // 3/3: the datacenter
       if (T > cue.dcHud && T < cue.fade + 0.1) {
         const a = 1 - smoothstep(cue.fade - 0.5, cue.fade, T);
         const [x, y] = proj(toW(mmToL([BCX - 14000, L.FLOOR + 7000, BCZ])));
-        overlay.hudClassify(g, { ...LABELS.datacenter, fields: F, anchor: [x, y], dir: [-1, -0.6], len: 130, t: T - cue.dcHud, alpha: a, S, charRate: 90 });
+        overlay.hudClassify(g, { ...LABELS.datacenter, fields: F, ...dockedHud([x, y], S), t: (T - cue.dcHud) * 1.35, alpha: a, S, charRate: 90 });
       }
     },
   };
 }
+

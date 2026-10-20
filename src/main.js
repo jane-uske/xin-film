@@ -48,24 +48,45 @@ if (q.has('render')) {
   // 实时预览
   const hud = document.getElementById('hud');
   const audio = new Audio('out/score.wav');
-  let t0 = performance.now(), offset = parseFloat(q.get('from') || '0'), playing = true, busy = false;
-  const now = () => (playing ? offset + (performance.now() - t0) / 1000 : offset);
-  const seek = (s) => { offset = Math.max(0, Math.min(timeline.duration, s)); t0 = performance.now(); audio.currentTime = offset; };
+  const lastTime = (Math.round(timeline.duration * timeline.fps) - 1) / timeline.fps;
+  const bound = (s) => Math.max(0, Math.min(lastTime, Number.isFinite(s) ? s : 0));
+  let t0 = performance.now(), offset = bound(parseFloat(q.get('from') || '0')), playing = true, busy = false;
+  let soundOn = false, audioMissing = false;
+  // 一旦声音开启，以音轨为时钟；慢帧只影响预览流畅度，不让声画越走越远。
+  const now = () => soundOn && !audio.paused ? audio.currentTime : (playing ? offset + (performance.now() - t0) / 1000 : offset);
+  const seek = (s) => { offset = bound(s); t0 = performance.now(); if (soundOn) audio.currentTime = offset; };
+  const startSound = async () => {
+    audio.currentTime = bound(now());
+    try { await audio.play(); soundOn = true; }
+    catch { soundOn = false; }
+  };
+  audio.addEventListener('error', () => {
+    offset = bound(now()); t0 = performance.now(); soundOn = false; audioMissing = true;
+  });
+  audio.addEventListener('ended', () => { offset = lastTime; playing = false; });
   addEventListener('keydown', (e) => {
-    if (e.code === 'Space') { if (playing) { offset = now(); audio.pause(); } else { t0 = performance.now(); audio.currentTime = offset; audio.play().catch(() => {}); } playing = !playing; }
+    if (['Space', 'ArrowRight', 'ArrowLeft', 'Home'].includes(e.code)) e.preventDefault();
+    if (e.code === 'Space') {
+      if (playing) { offset = bound(now()); playing = false; audio.pause(); }
+      else { if (offset >= lastTime) offset = 0; t0 = performance.now(); playing = true; if (soundOn) startSound(); }
+    }
     if (e.code === 'ArrowRight') seek(now() + 5);
     if (e.code === 'ArrowLeft') seek(now() - 5);
+    if (e.code === 'Home') seek(0);
   });
-  addEventListener('click', () => { audio.currentTime = now(); audio.play().catch(() => {}); }, { once: true });
+  addEventListener('click', () => { if (!soundOn && playing && !audioMissing) startSound(); });
   const loop = async () => {
     if (!busy) {
       busy = true;
-      const T = now() % timeline.duration;
-      await engine.renderFrame(Math.floor(T * timeline.fps));
-      hud.textContent = `${T.toFixed(2)}s  ·  click for sound  ·  space pause  ·  ←/→ seek`;
-      busy = false;
+      try {
+        const T = bound(now());
+        if (T >= lastTime) { offset = lastTime; playing = false; audio.pause(); }
+        await engine.renderFrame(Math.floor(T * timeline.fps));
+        hud.textContent = `${T.toFixed(2)}s / ${timeline.duration}s  ·  ${audioMissing ? '配乐尚未生成' : soundOn ? '声画同步' : '点击开启声音'}  ·  空格暂停  ·  ←/→ 跳转  ·  Home 从头播放`;
+      } finally { busy = false; }
     }
     requestAnimationFrame(loop);
   };
   loop();
 }
+

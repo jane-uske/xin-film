@@ -141,3 +141,4 @@ timeline.json ──┬─> src/ (Three.js 镜头模块) ──> tools/render.mj
                 └─> audio/score.py（numpy 合成，按 cue 对齐） ──> out/score.wav
                                          └──> tools/build.mjs：拼接 + 遮幅 + 混流 ──> out/XIN.mp4
 ```
+

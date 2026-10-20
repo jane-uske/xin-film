@@ -240,3 +240,4 @@ function mergeBoxes(THREE, a, b) {
   g.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
   return g;
 }
+

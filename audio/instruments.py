@@ -339,3 +339,4 @@ def sub_tone(note, n, label, harm=0.25):
     rng = rng_for('sub|' + label)
     y = np.sin(TAU * f * t + rng.uniform(0, TAU)) + harm * np.sin(TAU * 2 * f * t)
     return y
+

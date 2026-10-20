@@ -71,3 +71,4 @@ export function handheld(T, amp = 1, speed = 1, seed = 0) {
   const s = T * speed;
   return [fbm1(s * 0.31 + seed) * amp, fbm1(s * 0.27 + 40 + seed) * amp, fbm1(s * 0.19 + 80 + seed) * amp * 0.5];
 }
+

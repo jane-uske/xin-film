@@ -372,3 +372,4 @@ export function buildDatacenter(ctx) {
     layout: { rack0, hall0, BLD, yard, PLX, PLZ, FLOOR, HALLX, HALLZ, GAP, RW, RD, RH, PITCHZ },
   };
 }
+

@@ -295,3 +295,4 @@ export function makeDigital(ctx, shared, flameVS) {
   const haloU = { uOrigin: warm.u.uOrigin, uRight: warm.u.uRight, uGain: { value: 0 }, uCol: { value: new THREE.Vector3(0.25, 0.75, 1.0) }, uC: { value: new THREE.Vector2(0, 1.3) } };
   return { group, levels, origPts, orig, plinth, plU, chip, chipU, warm, haloU };
 }
+

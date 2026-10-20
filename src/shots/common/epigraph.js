@@ -32,7 +32,7 @@ export function makeEpigraph(ctx, camera, { card = null, burnStart = 0, ambient 
     });
     // 出处：第三列，起笔更低，字更小
     const ss = 17 * S * k, sadv = 22 * S * k;
-    [...SOURCE].forEach((ch, j) => glyphs.push({ ch, x: x0 - 2 * colGap + 6 * S, y: y0 + 6 * adv + j * sadv + ss, size: ss, order: 100 + j, kind: 'source' }));
+    [...SOURCE].forEach((ch, j) => glyphs.push({ ch, x: x0 - 2 * colGap + 6 * S, y: y0 + 4.7 * adv + j * sadv + ss, size: ss, order: 100 + j, kind: 'source' }));
   }
 
   // ---- 文字燃烧生成的余烬：在每个字的笔画像素上取样 ----
@@ -44,7 +44,7 @@ export function makeEpigraph(ctx, camera, { card = null, burnStart = 0, ambient 
     for (const gl of glyphs) {
       if (gl.kind !== 'main') continue;
       g.clearRect(0, 0, W, H);
-      g.font = `300 ${gl.size}px "Noto Serif SC"`;
+      g.font = `${TYPE.zhWeight} ${gl.size}px ${overlay.FONTS.zh}`;
       g.fillStyle = '#fff'; g.textAlign = 'center'; g.textBaseline = 'alphabetic';
       g.fillText(gl.ch, gl.x, gl.y);
       const x0 = Math.max(0, Math.floor(gl.x - gl.size)), y0 = Math.max(0, Math.floor(gl.y - gl.size * 1.2));
@@ -142,7 +142,7 @@ export function makeEpigraph(ctx, camera, { card = null, burnStart = 0, ambient 
         const heat = Math.max(1 - ease.outCubic(kk), ease.inQuad(burn) * 1.4, 0.0);
         const col = paper.map((c, i) => Math.round(c + (ember[i] - c) * clamp(heat)));
         g.save();
-        g.font = `300 ${gl.size}px ${overlay.FONTS.zh}`;
+        g.font = `${TYPE.zhWeight} ${gl.size}px ${overlay.FONTS.zh}`;
         g.textAlign = 'center';
         g.filter = `blur(${(10 + 6 * heat) * S}px)`;
         g.fillStyle = overlay.rgba(col, a * (0.22 + 0.55 * heat));
@@ -160,7 +160,7 @@ export function makeEpigraph(ctx, camera, { card = null, burnStart = 0, ambient 
           // 竖排破折号：两字高的一条细线
           g.fillRect(gl.x - 0.5 * S, gl.y - gl.size * 0.95, Math.max(1, 1 * S), gl.size * 2.1);
         } else if (gl.ch.trim()) {
-          g.font = `300 ${gl.size}px ${overlay.FONTS.zh}`;
+          g.font = `${TYPE.zhWeight} ${gl.size}px ${overlay.FONTS.zh}`;
           g.textAlign = 'center';
           g.fillText(gl.ch, gl.x, gl.y);
         }
@@ -174,7 +174,7 @@ export function makeEpigraph(ctx, camera, { card = null, burnStart = 0, ambient 
       const x = W * 0.085, y = H * 0.74;
       const fs = 25 * S * k, lh = 34 * S * k;
       EN_LINES.forEach((ln, i) => overlay.glowText(g, ln, x, y - lh + i * lh, { font: `italic 300 ${fs}px ${overlay.FONTS.en}`, color: paper, alpha: ea * 0.82, glow: 0.18, blur, spacing: `${0.6 * S}px`, align: 'left', S }));
-      overlay.glowText(g, card.enSource, x, y + 3.2 * lh, { font: `300 ${11.5 * S * k}px ${overlay.FONTS.mono}`, color: paper, alpha: ea * 0.5, glow: 0, blur, spacing: `${4 * S}px`, align: 'left', S });
+      overlay.glowText(g, card.enSource, x, y + 2.4 * lh, { font: `300 ${11.5 * S * k}px ${overlay.FONTS.mono}`, color: paper, alpha: ea * 0.5, glow: 0, blur, spacing: `${4 * S}px`, align: 'left', S });
     }
   }
 
@@ -184,3 +184,4 @@ export function makeEpigraph(ctx, camera, { card = null, burnStart = 0, ambient 
     dispose() { camera.remove(embers); eg.dispose(); mat.dispose(); },
   };
 }
+

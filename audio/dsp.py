@@ -62,6 +62,10 @@ def env_pts(n, pts, in_db=False):
     t = np.arange(n) / SR
     tp = np.array([p[0] for p in pts], dtype=float)
     vp = np.array([p[1] for p in pts], dtype=float)
+    if n < 0 or not len(tp) or not np.all(np.isfinite(tp)) or not np.all(np.isfinite(vp)):
+        raise ValueError('audio envelope needs finite points and a nonnegative length')
+    if np.any(np.diff(tp) < 0):
+        raise ValueError(f'audio envelope times must be ordered: {tp.tolist()}')
     e = np.interp(t, tp, vp)
     if in_db:
         e = 10.0 ** (e / 20.0)
@@ -395,3 +399,4 @@ def frac_delay(x, d):
     n = len(x)
     pos = np.arange(n) - np.asarray(d) * SR
     return np.interp(pos, np.arange(n), x, left=0.0, right=0.0)
+

@@ -240,3 +240,4 @@ export const defaultGrade = () => ({
   vignette: 0.35, ca: 0.0012, grain: 0.045,
   fade: 1.0,
 });
+

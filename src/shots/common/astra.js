@@ -27,3 +27,4 @@ export function layoutWord(word = 'ASTRA') {
   });
   return { nodes, segs, width: x - GAP };
 }
+

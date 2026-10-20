@@ -561,3 +561,4 @@ export function buildCosmos(ctx, scene) {
     core, coreU, flash, flashU, ring, ringU, star, starU, corona, coronaU, prom, promU, stars, starsU,
   };
 }
+

@@ -209,3 +209,4 @@ export function makeParticles(ctx) {
     point(x, y, z, r, g, b, s) { push(x, y, z, r, g, b, s); },
   };
 }
+

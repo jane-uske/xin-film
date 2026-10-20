@@ -4,3 +4,4 @@ export default async function create(ctx) {
     render(f) { return { bloom: 0, grain: 0.018, vignette: 0 }; },
   };
 }
+

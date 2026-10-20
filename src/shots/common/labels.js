@@ -48,3 +48,4 @@ export const LABELS = {
 // 供字体预加载：列出所有会出现的字符
 export const LABEL_TEXT = JSON.stringify(LABELS) + '0123456789.%：▍'
   + LABELS.model.fit('99.96') + LABELS.desync.name('0.000');
+

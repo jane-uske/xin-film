@@ -215,3 +215,4 @@ export function withGlitch(g, amount, seed, W, H, draw) {
   }
   g.globalAlpha = 1;
 }
+

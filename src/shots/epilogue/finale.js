@@ -272,3 +272,4 @@ function drawSession(g, T, card, W, H, S, overlay, util) {
   overlay.hudText(g, card.zh.slice(0, nz) + (ne === 0 && blinkOn ? '▍' : ''), W / 2, y, { size: 13, alpha: a, S, align: 'center', weight: 400, spacing: 0.18 });
   if (ne > 0) overlay.hudText(g, card.en.slice(0, ne) + (blinkOn ? '▍' : ''), W / 2, y + 26 * S, { size: 8.5, alpha: a * 0.5, S, align: 'center' });
 }
+

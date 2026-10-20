@@ -13,3 +13,4 @@ export default function stub(label, color = 0x101820) {
     };
   };
 }
+

@@ -139,3 +139,4 @@ export function createStarfield(ctx, { seed = 7, count = 34000, box = [110, 46, 
     dispose() { g.dispose(); mat.dispose(); nebRT.dispose(); nebMat.dispose(); bgMat.dispose(); bgGeo.dispose(); },
   };
 }
+

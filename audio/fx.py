@@ -580,3 +580,4 @@ def ember_stroke(dur, label, p=0.0):
         cr[i:i + cn] += resonator(c, rng.uniform(2500, 8000), 3) * rng.uniform(0.1, 0.5)
     y = (h + w + cr) * np.sin(np.pi * np.clip(x, 0, 1)) ** 1.2
     return pan(y, p)
+

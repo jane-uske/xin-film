@@ -215,3 +215,4 @@ export function buildEarth(ctx, scene, { E, patchN }) {
 
   return { group, surf, surfU, lights, lightU, atmo, atmoU, burst, burstU, sunU, NL, landLookup };
 }
+
