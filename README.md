@@ -17,6 +17,13 @@ node tools/build.mjs                   # 拼接 + 2.39:1 遮幅 + 混入配乐 -
 
 需要：Node.js 18+、Python 3（`pip install numpy scipy matplotlib`）、ffmpeg（macOS：`brew install ffmpeg`）。
 
+若 `pip install` 报 externally-managed（uv 或 Homebrew 管理的 Python），就在本目录建虚拟环境，之后把 `python3` 换成 `.venv/bin/python`：
+
+```bash
+uv venv .venv && uv pip install --python .venv/bin/python numpy scipy matplotlib
+.venv/bin/python audio/score.py
+```
+
 ```bash
 npm install
 npx playwright install chromium        # 下载渲染用的浏览器
