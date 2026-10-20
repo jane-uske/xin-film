@@ -268,6 +268,14 @@
       "en": "Does a simulated fire burn?"
     },
     {
+      "id": "c_trace",
+      "in": 161.2,
+      "out": 164.4,
+      "layout": "lower",
+      "zh": "只有它，在变短。",
+      "en": "Only one of them grows shorter."
+    },
+    {
       "id": "ch3",
       "in": 164.5,
       "out": 168.0,

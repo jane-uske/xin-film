@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { createStarfield } from '../common/starfield.js';
 import { all as GLSL } from '../../engine/glsl.js';
 import { layoutWord } from '../common/astra.js';
+import { LABELS } from '../common/labels.js';
 
 // 「芯」在 600×600 画布上（200 字重，440px，居中）的「心」部笔画中心线
 const G = 600;
@@ -207,6 +208,14 @@ export default async function create(ctx) {
       if (la > 0.001) {
         const blur = (1 - ease.outCubic(clamp((T - latinT) / 1.4))) * 4;
         overlay.glowText(g, 'XIN', W / 2 + 9 * S, cy + D * 0.5 + 34 * S, { font: `300 ${19 * S}px ${overlay.FONTS.en}`, color: overlay.COLORS.paper, alpha: la * 0.8, glow: 0.25, blur, spacing: `${18 * S}px`, S });
+      }
+      // 「芯」的三层意思，晚半拍浮现
+      const sa = envelope(T, latinT + 0.9, latinT + 2.1, titleOut, titleOut + 0.9);
+      if (sa > 0.001) {
+        const blur = (1 - ease.outCubic(clamp((T - latinT - 0.9) / 1.2))) * 4;
+        const y0 = cy + D * 0.5 + 72 * S;
+        overlay.glowText(g, LABELS.title.zh, W / 2 + 4 * S, y0, { font: `300 ${15 * S}px ${overlay.FONTS.zh}`, color: overlay.COLORS.paper, alpha: sa * 0.72, glow: 0.15, blur, spacing: `${8 * S}px`, S });
+        overlay.glowText(g, LABELS.title.en, W / 2 + 3 * S, y0 + 24 * S, { font: `300 ${9.5 * S}px ${overlay.FONTS.mono}`, color: overlay.COLORS.paper, alpha: sa * 0.45, glow: 0, blur, spacing: `${5 * S}px`, S });
       }
       // 片尾
       const ca = envelope(T, credits.in, credits.in + 1.3, credits.out - 1.0, credits.out);

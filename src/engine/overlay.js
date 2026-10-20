@@ -4,7 +4,8 @@ import { clamp, invLerp, ease, rng } from './util.js';
 export const FONTS = {
   zh: '"Noto Serif SC", serif',
   en: '"Cormorant Garamond", serif',
-  mono: '"JetBrains Mono", monospace',
+  // HUD：拉丁字符用等宽体，中文落到思源黑体
+  mono: '"JetBrains Mono", "Noto Sans SC", sans-serif',
 };
 
 export const COLORS = {
@@ -21,6 +22,7 @@ export async function loadFonts(texts) {
     `300 48px ${FONTS.zh}`, `400 48px ${FONTS.zh}`, `200 48px ${FONTS.zh}`,
     `italic 300 32px ${FONTS.en}`, `italic 400 32px ${FONTS.en}`, `300 32px ${FONTS.en}`, `400 32px ${FONTS.en}`,
     `300 14px ${FONTS.mono}`, `400 14px ${FONTS.mono}`,
+    '300 14px "Noto Sans SC"', '400 14px "Noto Sans SC"',
   ];
   for (const f of loads) {
     try { await document.fonts.load(f, all); } catch (e) { console.warn('font load failed', f, e); }
@@ -112,17 +114,21 @@ export function hudCallout(g, { anchor, dir = [1, -0.6], len = 120, lines = [], 
   const tx = ex + (right ? 8 * S : -8 * S), ty = ey - 9 * S;
   g.textAlign = right ? 'left' : 'right';
   g.textBaseline = 'alphabetic';
-  let shown = Math.max(0, (t - 0.75) * charRate);
+  // 每行逐字打出：默认接在上一行之后，ln.at 可指定该行开始的本地时间
+  // ln.en 为英文辅助小字；中文行字号更大，便于阅读
+  let start = 0.75, below = ey + 8 * S;
   lines.forEach((ln, i) => {
-    const n = Math.min(ln.text.length, Math.floor(shown));
-    shown -= ln.text.length + 4;
+    if (ln.at !== undefined) start = Math.max(start, ln.at);
+    const n = Math.min(ln.text.length, Math.floor((t - start) * charRate));
+    start += ln.text.length / charRate + 0.12;
+    const size = (ln.size || (ln.en ? 9.5 : i === 0 ? 14 : 12.5)) * S;
+    // 第一行在横线之上，其余行依次在横线之下
+    let yy = ty;
+    if (i > 0) { below += size * 1.55; yy = below; }
     if (n <= 0) return;
-    const size = (ln.size || (i === 0 ? 12.5 : 11)) * S;
-    g.font = `${ln.weight || 300} ${size}px ${FONTS.mono}`;
-    g.letterSpacing = `${(ln.spacing ?? 0.2) * size}px`;
-    g.fillStyle = rgba(ln.color || color, alpha * (ln.alpha ?? (i === 0 ? 0.92 : 0.6)));
-    // 第一行在横线之上，其余行在横线之下
-    const yy = i === 0 ? ty : ey + 8 * S + i * 16 * S;
+    g.font = `${ln.weight || (ln.en ? 300 : 400)} ${size}px ${FONTS.mono}`;
+    g.letterSpacing = `${(ln.spacing ?? (ln.en ? 0.2 : 0.12)) * size}px`;
+    g.fillStyle = rgba(ln.color || color, alpha * (ln.alpha ?? (ln.en ? 0.45 : i === 0 ? 0.95 : 0.75)));
     let txt = ln.text.slice(0, n);
     // 打字光标
     if (n < ln.text.length) txt += '▍';

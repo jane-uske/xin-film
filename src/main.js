@@ -4,6 +4,7 @@
 //   （默认）            浏览器实时预览，带配乐，空格暂停，←/→ 跳 5 秒
 import { Engine } from './engine/engine.js';
 import { loadFonts } from './engine/overlay.js';
+import { LABEL_TEXT } from './shots/common/labels.js';
 
 const q = new URLSearchParams(location.search);
 const scale = parseFloat(q.get('scale') || '1');
@@ -14,6 +15,7 @@ timeline.credit = { word: 'ASTRA' };
 try { const r = await fetch('credit.local.json'); if (r.ok) Object.assign(timeline.credit, await r.json()); } catch (e) { /* 无本地配置 */ }
 const texts = timeline.cards.flatMap((c) => [c.zh, c.en, c.zhSource || '', c.enSource || '']).concat([
   '芯心艹XINASTRA出品PRESENTS壹贰叁·热HEATWICKMIND0123456789,.KWMGBt/s→…' + timeline.credit.word,
+  LABEL_TEXT,
 ]);
 await loadFonts(texts);
 

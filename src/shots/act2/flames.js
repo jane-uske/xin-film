@@ -11,6 +11,7 @@ import { makeDigital, DIG } from './digitalFlame.js';
 import { makeLattice, stepAt, LAT } from './lattice.js';
 import { makeSeed } from './seed.js';
 import { makeParticles } from './particles.js';
+import { LABELS } from '../common/labels.js';
 
 export default async function create(ctx) {
   const { THREE, util, overlay, cue } = ctx;
@@ -489,7 +490,8 @@ export default async function create(ctx) {
       const [N, NY] = DIG.levels[lvl];
       const [x, y] = origScreen;
       overlay.hudCallout(g, { anchor: [x + 70 * S, y - 10 * S], dir: [1, -0.55], len: 90, t: T - s13a, alpha: a * 0.85, S,
-        lines: [{ text: 'FLAME.MODEL' }, { text: `RES ${N}×${N}×${NY}` }, { text: lvl >= 4 ? 'FIT 0.9996' : `FIT ${(0.62 + lvl * 0.09).toFixed(4)}` }] });
+        lines: [{ text: LABELS.model.name }, { text: LABELS.model.fit(lvl >= 4 ? '99.96' : ((0.62 + lvl * 0.09) * 100).toFixed(0)) },
+          { text: LABELS.model.en(N, NY), en: true }] });
     }
     // S15–S16：实例计数
     const c0 = cue('copy_2') - 0.6, c1 = cue('hud_glitch') + 1.4;
@@ -497,11 +499,11 @@ export default async function create(ctx) {
       const k = Math.min(n, 20);
       const a = smoothstep(c0, c0 + 0.4, T);
       const drawCounter = (gg) => {
-        overlay.hudText(gg, 'INSTANCES', W - 96 * S, 74 * S, { size: 10.5, alpha: 0.55 * a, S, align: 'right' });
+        overlay.hudText(gg, `${LABELS.copies.name}  ${LABELS.copies.en}`, W - 96 * S, 74 * S, { size: 10.5, alpha: 0.6 * a, S, align: 'right' });
         overlay.hudText(gg, fmtInt(2 ** k), W - 96 * S, 98 * S, { size: 19, alpha: 0.9 * a, S, align: 'right', weight: 300, spacing: 0.12 });
         gg.save(); gg.strokeStyle = overlay.rgba(overlay.COLORS.hud, 0.5 * a); gg.lineWidth = Math.max(1, S);
         gg.beginPath(); gg.moveTo(W - 96 * S, 82 * S); gg.lineTo(W - 96 * S - 150 * S, 82 * S); gg.stroke(); gg.restore();
-        if (T > cue('ch3_in')) overlay.hudText(gg, 'SYNC 100.000 %', W - 96 * S, 120 * S, { size: 10, alpha: 0.5 * a, S, align: 'right' });
+        if (T > cue('ch3_in')) overlay.hudText(gg, LABELS.copies.sync, W - 96 * S, 122 * S, { size: 11, alpha: 0.6 * a, S, align: 'right', spacing: 0.12 });
       };
       const gl = glitchAmt(T);
       if (gl >= 1) return drawDesync(g, f);
@@ -529,8 +531,10 @@ export default async function create(ctx) {
     const draw = (gg) => {
       overlay.hudBracket(gg, { x, y: y - 20 * S, w: bw, h: bh, t: T - t0, alpha: dissolve, S, color: overlay.COLORS.hudWarn, corner: 16 });
       if (T - t0 > 0.35) {
-        overlay.hudText(gg, `DESYNC ${delta.toFixed(3)} s`, x + bw / 2 + 12 * S, Math.max(y - 20 * S - bh / 2, 30 * S) + 12 * S, { size: 11, alpha: 0.9 * dissolve, S, color: overlay.COLORS.hudWarn });
-        overlay.hudText(gg, 'INSTANCE 0000000', x + bw / 2 + 12 * S, Math.max(y - 20 * S - bh / 2, 30 * S) + 30 * S, { size: 9.5, alpha: 0.55 * dissolve, S, color: overlay.COLORS.hudWarn });
+        const lx = x + bw / 2 + 12 * S, ly = Math.max(y - 20 * S - bh / 2, 30 * S);
+        overlay.hudText(gg, LABELS.desync.name(delta.toFixed(3)), lx, ly + 14 * S, { size: 14, alpha: 0.95 * dissolve, S, color: overlay.COLORS.hudWarn, weight: 400, spacing: 0.1 });
+        overlay.hudText(gg, LABELS.desync.fact, lx, ly + 36 * S, { size: 12, alpha: 0.8 * dissolve, S, color: overlay.COLORS.hudWarn, spacing: 0.1 });
+        overlay.hudText(gg, LABELS.desync.en, lx, ly + 54 * S, { size: 9, alpha: 0.45 * dissolve, S, color: overlay.COLORS.hudWarn });
       }
     };
     overlay.withGlitch(g, gl, (f.frame * 104729) % 100000 + 7, W, H, draw);

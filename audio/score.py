@@ -532,7 +532,7 @@ def build(tl):
     # the candle: one continuous flame signal F1 (its digital twin is the same signal)
     fa = FC - 0.4
     n = ns(CB + 0.05 - fa)
-    F1, flick = X.flame(n, 'candle', crackle_rate=0.85)
+    F1, flick = X.flame(n, 'candle', crackle_rate=0.3)
     F1 = F1 / (np.std(F1) * 4.0)
     tt = fa + tvec(n)
     cand_g = Adb(n, fa, [(fa, -110), (FC, -110), (FC + 0.5, -21), (TR, -21), (TR + 4, -26), (cas0 - 1, -27),
@@ -705,7 +705,7 @@ def build(tl):
     to = DS - 1.0 + tvec(no)
     dly = 0.03 * ease((to - DS) / (WS0 - DS))
     Dorig = frac_delay(Dorig, dly)
-    F2, _ = X.flame(no, 'warm', crackle_rate=1.4)
+    F2, _ = X.flame(no, 'warm', crackle_rate=0.6)
     F2 = F2 / (np.std(F2) * 4.0)
     F2 = eq(F2, [('lowshelf', 300.0, 0.7, 3.0), ('highshelf', 5000.0, 0.7, -3.0)])
     xw = ease((to - WS0) / (WS1 - WS0))
@@ -791,7 +791,7 @@ def build(tl):
                 (-46, -40), lambda t: 0.1 + 0.85 * np.clip((t - SRt - 2) / 14.0, 0, 1), {'room': 0.1, 'space': 0.4},
                 shape='exp')
     n = ns(C['title_xin_heart_start'] - SRt)
-    pair, _ = X.flame(n, 'pair', crackle_rate=0.4)
+    pair, _ = X.flame(n, 'pair', crackle_rate=0.25)
     pair = pair / (np.std(pair) * 4.0) * Adb(n, SRt, [(SRt, -110), (SRt + 2, -44), (SRt + 10, -46),
                                                        (C['title_xin_heart_start'], -110)])
     mx.add('ambience', SRt, np.stack([pair, np.roll(pair, ns(0.37))]) * 0.7, 0.0, sends={'hall': 0.2})
@@ -836,7 +836,7 @@ def build(tl):
     mx.add('sfx', EM, X.match_strike('m2'), -11.0, sends={'room': 0.3, 'hall': 0.08})
     EH, EF = C['end_flame_hiss'], C['end_fade']
     n = ns(D - EH)
-    F3, _ = X.flame(n, 'end', crackle_rate=1.0)
+    F3, _ = X.flame(n, 'end', crackle_rate=0.4)
     F3 = F3 / (np.std(F3) * 4.0) * Adb(n, EH, [(EH, -110), (EH + 0.4, -22), (EF, -23), (EF + 0.5, -110)])
     mx.add('ambience', EH, F3, 0.0, 0.0, {'room': 0.25})
     mx.automate(['music', 'sfx', 'ambience'], [(EF, 0), (EF + 0.5, -110)])

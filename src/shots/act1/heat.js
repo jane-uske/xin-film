@@ -7,6 +7,7 @@ import { buildEarth, EARTH_R } from './earth.js';
 import { buildNetwork, BRAIN_C, DIE_Y } from './network.js';
 import { buildDatacenter, MM } from './datacenter.js';
 import { catmull } from './lib.js';
+import { LABELS } from '../common/labels.js';
 
 export default async function create(ctx) {
   const { THREE, util, overlay } = ctx;
@@ -550,17 +551,6 @@ export default async function create(ctx) {
       const proj = (v) => ctx.project(new THREE.Vector3(v[0], v[1], v[2]), cam);
       const camR = new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld, 0);
       const camU = new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld, 1);
-      // typed extra line under a callout shelf (same geometry as overlay.hudCallout)
-      const extraLine = (anchor, dir, len, text, t, alpha) => {
-        if (t <= 0) return;
-        const dl = Math.hypot(dir[0], dir[1]), ux = dir[0] / dl, uy = dir[1] / dl;
-        const ex = anchor[0] + ux * len * S, ey = anchor[1] + uy * len * S;
-        const right = ux >= 0;
-        const n = Math.min(text.length, Math.floor(t * 38));
-        if (n <= 0) return;
-        const txt = text.slice(0, n) + (n < text.length ? '▍' : '');
-        overlay.hudText(g, txt, ex + (right ? 8 : -8) * S, ey + 8 * S + 16 * S, { size: 11, S, alpha: alpha * 0.6, align: right ? 'left' : 'right', spacing: 0.2 });
-      };
       // S06 star: SURFACE / BURNS
       if (T > cue.hud1 && T < cue.pull + 0.2) {
         const a = 1 - smoothstep(cue.pull - 1.6, cue.pull - 0.4, T);
@@ -568,8 +558,11 @@ export default async function create(ctx) {
         const w = camR.clone().multiplyScalar(-0.62 * R).add(camU.clone().multiplyScalar(0.3 * R));
         const [x, y] = proj([w.x, w.y, w.z]);
         const dir = [-1, -0.62], len = 170;
-        overlay.hudCallout(g, { anchor: [x, y], dir, len, lines: [{ text: 'SURFACE  5,778 K' }], t: T - cue.hud1, alpha: a, S });
-        extraLine([x, y], dir, len, 'BURNS  4.3 MILLION t / s', T - cue.hud2, a);
+        const at2 = cue.hud2 - cue.hud1;
+        overlay.hudCallout(g, { anchor: [x, y], dir, len, t: T - cue.hud1, alpha: a, S, lines: [
+          { text: LABELS.star.temp }, { text: LABELS.star.tempEn, en: true },
+          { text: LABELS.star.burn, at: at2 }, { text: LABELS.star.burnEn, en: true, at: at2 + 0.3 },
+        ] });
       }
       // S07 Earth
       const tE = cue.earth + 0.9;
@@ -577,25 +570,25 @@ export default async function create(ctx) {
         const a = 1 - smoothstep(cue.dive - 0.6, cue.dive + 0.2, T);
         const w = new THREE.Vector3(...E).add(camR.clone().multiplyScalar(-EARTH_R * 0.96)).add(camU.clone().multiplyScalar(-EARTH_R * 0.25));
         const [x, y] = proj([w.x, w.y, w.z]);
-        overlay.hudCallout(g, { anchor: [x, y], dir: [-1, 0.42], len: 120, lines: [{ text: 'EARTH' }], t: T - tE, alpha: a, S });
+        overlay.hudCallout(g, { anchor: [x, y], dir: [-1, 0.42], len: 120, lines: [{ text: LABELS.earth.name }, { text: LABELS.earth.en, en: true }], t: T - tE, alpha: a, S });
       }
       // S08 brain
       if (T > cue.brainHud && T < cue.snap) {
         const a = 1 - smoothstep(cue.snap - 0.9, cue.snap - 0.2, T);
         const [x, y] = proj(toW([0.36, 1.2, 0.42]));
-        overlay.hudCallout(g, { anchor: [x, y], dir: [1, -0.5], len: 150, lines: [{ text: 'HUMAN BRAIN' }, { text: '86 BILLION NEURONS · 20 W' }], t: T - cue.brainHud, alpha: a, S });
+        overlay.hudCallout(g, { anchor: [x, y], dir: [1, -0.5], len: 150, lines: [{ text: LABELS.brain.name }, { text: LABELS.brain.fact }, { text: LABELS.brain.en, en: true }], t: T - cue.brainHud, alpha: a, S });
       }
       // S09 GPU
       if (T > cue.gpuHud && T < T_PO + 1.6) {
         const a = 1 - smoothstep(T_PO + 0.6, T_PO + 1.4, T);
         const [x, y] = proj(toW([0.0, DIE_Y, 0.0]));
-        overlay.hudCallout(g, { anchor: [x, y], dir: [1, -0.48], len: 170, lines: [{ text: 'GPU · 700 W' }], t: T - cue.gpuHud, alpha: a, S });
+        overlay.hudCallout(g, { anchor: [x, y], dir: [1, -0.48], len: 170, lines: [{ text: LABELS.gpu.name }, { text: LABELS.gpu.en, en: true }], t: T - cue.gpuHud, alpha: a, S });
       }
       // S09 datacenter
       if (T > cue.dcHud && T < cue.cardIn) {
         const a = 1 - smoothstep(cue.cardIn - 1.2, cue.cardIn - 0.3, T);
         const [x, y] = proj(toW(mmToL([BCX - 12000, L.FLOOR + 7000, BCZ])));
-        overlay.hudCallout(g, { anchor: [x, y], dir: [-1, -0.55], len: 150, lines: [{ text: 'DATACENTER · 150 MW' }], t: T - cue.dcHud, alpha: a, S });
+        overlay.hudCallout(g, { anchor: [x, y], dir: [-1, -0.55], len: 150, lines: [{ text: LABELS.datacenter.name }, { text: LABELS.datacenter.fact }, { text: LABELS.datacenter.en, en: true }], t: T - cue.dcHud, alpha: a, S });
       }
     },
   };

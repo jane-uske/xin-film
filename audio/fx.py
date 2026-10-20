@@ -415,19 +415,21 @@ def relay_thunk(label):
 # fire
 # ----------------------------------------------------------------------------
 def flame(n, label, crackle_rate=0.9, size=1.0, flicker=None):
-    """Close-miked candle flame: soft hiss, low turbulent flutter, wick crackles.
+    """Close-miked candle flame: a real candle is nearly silent, so this is mostly a soft
+    low-frequency flutter (the flame 'breathing'), a trace of air, and rare, small wick crackles.
     Returns (mono, flicker_control)."""
     rng = rng_for('flame|' + label)
     if flicker is None:
         c1 = smooth_noise(n, 8.0, rng)
         c2 = smooth_noise(n, 0.9, rng)
         flicker = np.clip(1 + 0.17 * c1 + 0.2 * c2, 0.3, None)
-    hiss = bp(rng.standard_normal(n), 600.0, 7500.0, 2)
-    hiss = eq(hiss, [('peak', 2600.0, 0.8, 3.0), ('highshelf', 6000.0, 0.7, -4.0)]) * flicker ** 1.5
+    # 只留一丝空气感：低通到 2.5 kHz 以下、极轻，避免宽带嘶声听起来像"沙沙"的静电
+    hiss = bp(rng.standard_normal(n), 300.0, 2500.0, 2)
+    hiss = eq(hiss, [('highshelf', 1500.0, 0.7, -6.0)]) * flicker ** 1.5
     puffs = np.clip(smooth_noise(n, 13.0, rng) + 0.3, 0, None)
-    flut = hp(lp(rng.standard_normal(n), 170.0 * size, 2), 30.0, 2) * (0.3 + puffs) * flicker
-    body = bp(rng.standard_normal(n), 140.0, 900.0, 2) * flicker
-    y = 0.45 * hiss + 1.0 * flut + 0.35 * body
+    flut = hp(lp(rng.standard_normal(n), 140.0 * size, 2), 25.0, 2) * (0.3 + puffs) * flicker
+    body = bp(rng.standard_normal(n), 90.0, 500.0, 2) * flicker
+    y = 0.06 * hiss + 1.0 * flut + 0.25 * body
     # crackles
     cr = np.zeros(n)
     dur = n / SR
@@ -440,8 +442,8 @@ def flame(n, label, crackle_rate=0.9, size=1.0, flicker=None):
             if i + cn >= n:
                 continue
             x = rng.standard_normal(cn) * np.exp(-tvec(cn) / rng.uniform(0.0004, 0.0025))
-            x = resonator(x, rng.uniform(1400, 6500), rng.uniform(1.5, 5))
-            cr[i:i + cn] += x * min(rng.lognormal(0, 0.5), 2.0) * 0.45
+            x = resonator(x, rng.uniform(700, 2600), rng.uniform(1.5, 4))
+            cr[i:i + cn] += x * min(rng.lognormal(0, 0.5), 2.0) * 0.25
     y = y + cr
     return y, flicker
 
