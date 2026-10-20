@@ -441,7 +441,7 @@ def flame(n, label, crackle_rate=0.9, size=1.0, flicker=None):
                 continue
             x = rng.standard_normal(cn) * np.exp(-tvec(cn) / rng.uniform(0.0004, 0.0025))
             x = resonator(x, rng.uniform(1400, 6500), rng.uniform(1.5, 5))
-            cr[i:i + cn] += x * rng.lognormal(0, 0.5) * 0.9
+            cr[i:i + cn] += x * min(rng.lognormal(0, 0.5), 2.0) * 0.45
     y = y + cr
     return y, flicker
 

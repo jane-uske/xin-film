@@ -47,8 +47,6 @@ export default async function create(ctx) {
   const dHalo = new THREE.Mesh(hq, new THREE.ShaderMaterial({ glslVersion: THREE.GLSL3, vertexShader: flameVS, fragmentShader: haloFS, uniforms: dHaloU, transparent: true, depthWrite: false, depthTest: false, blending: THREE.AdditiveBlending }));
   dHalo.frustumCulled = false; dHalo.renderOrder = 21;
 
-  // 光桥（S17）：两焰尖伸向彼此的细光丝
-  const bridgeN = 2 * 120;
   scene.add(floor.mesh, candle.group, digital.group, lattice.group, seed.pts, parts.glow, parts.bokeh, dHalo);
   // 加法混合的着色器都输出 alpha = 0 的"纯光"：用预乘模式让混合成为 ONE, ONE
   scene.traverse((o) => { if (o.material && o.material.blending === THREE.AdditiveBlending) o.material.premultipliedAlpha = true; });
@@ -96,7 +94,6 @@ export default async function create(ctx) {
   const twoShot = (y) => ({ tg: V3(DIG.X / 2, y, 0), dist: 26, az: 0, el: 2.0 * D2R });
 
   function camPose(T, st) {
-    const S = f_shot(T);
     let P;
     if (T < cue('track_right')) {
       P = poseCandlePush(T, st);
@@ -123,7 +120,7 @@ export default async function create(ctx) {
       // 对称的双人镜头，中间留给字幕卡；种子飘向蜡烛时镜头开始轻轻呼吸
       const ts = twoShot(lerp(st.wickY, DIG.wickY, 0.5) + 1.25);
       const u = ease.inOutSine(invLerp(cue('seed_enter'), cue('copy_2') - 1.0, T));
-      P = { tg: ts.tg, dist: lerp(26, 22.5, u), az: 0, el: ts.el, hand: 0.55 * smoothstep(cue('seed_through_digital') + 0.5, cue('seed_through_digital') + 2.5, T) };
+      P = { tg: ts.tg, dist: lerp(26, 20.0, u), az: 0, el: ts.el, hand: 0.55 * smoothstep(cue('seed_through_digital') + 0.5, cue('seed_through_digital') + 2.5, T) };
     } else if (T < cue('candle_return')) {
       P = latticePose(T, st);
     } else if (T < cue('ch3_in') - 0.5) {
@@ -187,7 +184,7 @@ export default async function create(ctx) {
   }
   function camPoseS14End(st) {
     const ts = twoShot(lerp(st.wickY, DIG.wickY, 0.5) + 1.25);
-    return { tg: ts.tg, dist: 22.5, az: 0, el: ts.el, hand: 0.55 };
+    return { tg: ts.tg, dist: 20.0, az: 0, el: ts.el, hand: 0.55 };
   }
   // S16：贴地沿一排复制体滑行，最初那一团最近
   function rowGlide(T) {
@@ -198,7 +195,6 @@ export default async function create(ctx) {
     const tg = pos.clone().add(V3(Math.sin(yaw) * 40, 0.0, -Math.cos(yaw) * 40));
     return { pos, tg, hand: smoothstep(cue('warm_shift_start'), cue('warm_shift_end'), T) * 0.9 };
   }
-  const f_shot = (T) => 0;
 
   function applyCamera(T, st) {
     const P = camPose(T, st);
@@ -359,6 +355,11 @@ export default async function create(ctx) {
     parts.burn(T, cue, seedBurnPos, st, candle.waxU.uAsh.value);
     parts.curl(T, cue, seedBurnPos);
     parts.embers(T, cue, [DIG.X, DIG.wickY, 0], burn > 0 ? smoothstep(cue('self_burn_start'), cue('self_burn_start') + 1.5, T) : 0, flO.f0[2]);
+    // 机器醒来：芯片上先亮起一个青色的点
+    if (digVisible && !away) {
+      const wp = wake * (1 - 0.85 * appear) * (1 - smoothstep(cue('self_burn_start'), cue('self_burn_start') + 2, T));
+      if (wp > 0.001) parts.point(DIG.X, DIG.plinthH + DIG.chipH + 0.04, 0, 0.6 * wp * 22, 2.4 * wp * 22, 3.2 * wp * 22, 7);
+    }
     // 光桥
     if (T >= cue('bridge_start')) bridge(T, st, flC, flO);
     parts.end(S);
@@ -518,7 +519,6 @@ export default async function create(ctx) {
     overlay.withGlitch(g, gl, (f.frame * 104729) % 100000 + 7, W, H, draw);
   }
 
-  if (typeof window !== 'undefined') window.__act2 = { scene, camera, digital, lattice, shared, THREE };
   return {
     msaa: 0,
     render,

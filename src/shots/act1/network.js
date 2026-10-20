@@ -85,13 +85,17 @@ export function buildNetwork(ctx, { earthR }) {
 
   // ---------------------------------------------------------------- graph -> particles
   const P = { city: [], brain: [], chip: [], info: [], morph: [] };
+  // morph delay: a wave from downtown outward. Whole edges share one delay so fibres stay lines in flight.
+  let edgeDelay = null;
+  const delayOf = (c) => Math.pow(util.clamp(Math.hypot(c[0], c[2]) / cityR), 0.85) * 0.9 + rng() * 0.04;
   const push = (brain, chip, type, s, phase, bright) => {
     const c = cityOf(brain);
+    const dl = edgeDelay !== null ? edgeDelay : delayOf(c);
     P.city.push(c[0], c[1], c[2]);
     P.brain.push(brain[0], brain[1], brain[2]);
     P.chip.push(chip[0], DIE_Y, chip[1]);
     P.info.push(type, s, phase, bright);
-    P.morph.push(rng(), rng(), rng(), rng());
+    P.morph.push(dl, rng(), rng(), rng());
   };
   // Manhattan route between two snapped die points
   const route = (a, b, hFirst, s) => {
@@ -106,7 +110,7 @@ export function buildNetwork(ctx, { earthR }) {
     P.brain.push(brain[0], brain[1], brain[2]);
     P.chip.push(chip[0], DIE_Y, chip[1]);
     P.info.push(type, s, phase, bright);
-    P.morph.push(rng(), rng(), rng(), rng());
+    P.morph.push(edgeDelay !== null ? edgeDelay : delayOf(city), rng(), rng(), rng());
   };
   // bus: A -> nearest horizontal gutter -> across -> down to B (Z route), on its own track
   const busRoute = (a, b, gz, track, s) => {
@@ -121,6 +125,7 @@ export function buildNetwork(ctx, { earthR }) {
     const ca = chipXZ(a), cb = chipXZ(b);
     const hFirst = rng() < 0.5;
     const phase = rng();
+    edgeDelay = delayOf(cityOf(a));
     if (type === 2) {
       // axons: straight highways in the city, white-matter arcs in the brain, gutter buses on the die
       const cA = cityOf(a), cB = cityOf(b);
@@ -133,6 +138,7 @@ export function buildNetwork(ctx, { earthR }) {
         const c = [cA[0] + (cB[0] - cA[0]) * s, (cA[1] + cB[1]) / 2 + 0.001, cA[2] + (cB[2] - cA[2]) * s];
         pushC(c, p, busRoute(ca, cb, gz, track, s), 2, s, phase, bright * (0.6 + 0.4 * rng()));
       }
+      edgeDelay = null;
       return;
     }
     for (let k = 0; k < n; k++) {
@@ -147,6 +153,7 @@ export function buildNetwork(ctx, { earthR }) {
       p = [p[0] + rng.gauss() * j, p[1] + rng.gauss() * j, p[2] + rng.gauss() * j];
       push(p, route(ca, cb, hFirst, s), type, s, phase, bright * (0.6 + 0.4 * rng()));
     }
+    edgeDelay = null;
   };
 
   // somata on gyral crowns (cortex) + cerebellum + brainstem
@@ -194,6 +201,7 @@ export function buildNetwork(ctx, { earthR }) {
     // soma blob
     const nb = Math.floor(10 + 10 * so.size);
     const ca = chipXZ(so.p);
+    edgeDelay = delayOf(cityOf(so.p));
     for (let k = 0; k < nb; k++) {
       const r = 0.008 * so.size;
       const p = [so.p[0] + rng.gauss() * r, so.p[1] + rng.gauss() * r, so.p[2] + rng.gauss() * r];
@@ -201,6 +209,7 @@ export function buildNetwork(ctx, { earthR }) {
       const px = ca[0] + (Math.floor(rng() * 3) - 1) * GRID * 0.5, pz = ca[1] + (Math.floor(rng() * 3) - 1) * GRID * 0.5;
       push(p, [px, pz], 0, 0, rng(), 1.0);
     }
+    edgeDelay = null;
     // dendritic trees in the cortical tangent plane, re-projected onto the folded surface
     const [t1, t2] = tangentBasis(so.n);
     const nBr = so.stem ? 1 : 3;
@@ -290,11 +299,11 @@ export function buildNetwork(ctx, { earthR }) {
       void main(){
         float type = aInfo.x;
         // city -> brain: staggered, lifting arc, a little turbulence mid-flight
-        float d1 = aMorph.x * 0.42;
-        float k1 = smoothstep(d1, d1 + 0.58, uCB);
+        float d1 = aMorph.x * 0.6;
+        float k1 = smoothstep(d1, d1 + 0.4, uCB);
         vec3 p = mix(position, aBrain, k1);
         float mid = sin(3.14159 * k1);
-        p.y += mid * 0.22 * (0.4 + aMorph.z);
+        p.y += mid * 0.16;
         if (uTurb > 0.0){
           vec3 q = p * 3.0 + vec3(0.0, uT * 0.25, aMorph.w * 3.0);
           p += vec3(snoise(q), snoise(q + 17.0), snoise(q + 41.0)) * 0.05 * mid;

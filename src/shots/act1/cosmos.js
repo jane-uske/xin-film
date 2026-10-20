@@ -83,7 +83,7 @@ export function buildCosmos(ctx, scene) {
     uHeat: { value: 0 }, uFade: { value: 1 }, uHotK: { value: 1 }, uS: { value: ctx.S }, uSize: { value: 1 }, uGain: { value: 1 }, uDebris: { value: 1 },
   };
 
-  const CLOUD_FN = /* glsl */ `
+  const CLOUD_BODY = /* glsl */ `
   uniform float uT, uCollapse, uG, uImp, uShock, uHeat, uFade, uSize, uGain, uDebris, uHotK;
   ${glsl.simplex3}
   ${glsl.blackbody}
@@ -95,9 +95,9 @@ export function buildCosmos(ctx, scene) {
     float cR = smoothstep(0.08, 1.0, c);
     float R = mix(cyl.x, dsk.x, cR);
     float y = mix(cyl.z, dsk.y, cY);
-    float phi = cyl.y + dsk.z * uG;
+    float phi = cyl.y + dsk.z * GROT;
     // implosion: inner disk falls all the way, outer disk is dragged part-way
-    float k = pow(uImp, 1.7);
+    float k = pow(IMP, 1.7);
     float w = mix(1.0, 0.62, smoothstep(5.0, 24.0, dsk.x));
     phi += k * 3.0 * pow(10.0 / max(dsk.x, 1.5), 0.5);
     R *= 1.0 - 0.985 * k * w;
@@ -139,10 +139,11 @@ export function buildCosmos(ctx, scene) {
     // shock-heated material: blue-white at the front, cooling to orange / dull red behind it
     float Ks = 2200.0 + 11000.0 * front;
     vec3 sh = blackbody(Ks) * (front * 9.0 + shocked * 0.18 * exp(-uShock * 0.6)) * uHotK;
-    col = (base + hot) * (1.0 - shocked) * (1.0 - 0.85 * k * w) + (base * 0.35 * uDebris + sh) * shocked;
+    col = (base + hot) * (1.0 - shocked) * (1.0 - 0.97 * k) + (base * 0.35 * uDebris + sh) * shocked;
     vis = 1.0;
     return p;
   }`;
+  const CLOUD_FN = '#define IMP uImp\n#define GROT uG\n' + CLOUD_BODY;
 
   const cloudMat = new THREE.ShaderMaterial({
     uniforms: cloudU,
@@ -172,6 +173,53 @@ export function buildCosmos(ctx, scene) {
   const cloud = new THREE.Points(cloudGeo, cloudMat);
   cloud.frustumCulled = false;
   scene.add(cloud);
+
+  // implosion streaks: line segments whose tail vertex evaluates the same closed-form motion slightly earlier
+  const NSTK = 26000, SSTR = Math.floor(NC / NSTK);
+  const stkGeo = new THREE.BufferGeometry();
+  {
+    const c3 = new Float32Array(NSTK * 6), d3 = new Float32Array(NSTK * 6), r4 = new Float32Array(NSTK * 8), tl = new Float32Array(NSTK * 2);
+    for (let i = 0; i < NSTK; i++) {
+      const j = i * SSTR;
+      for (let v = 0; v < 2; v++) {
+        const o = i * 2 + v;
+        c3.set(aCyl.subarray(j * 3, j * 3 + 3), o * 3);
+        d3.set(aDisk.subarray(j * 3, j * 3 + 3), o * 3);
+        r4.set(aRnd.subarray(j * 4, j * 4 + 4), o * 4);
+        tl[o] = v;
+      }
+    }
+    stkGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(NSTK * 6), 3));
+    stkGeo.setAttribute('aCyl', new THREE.BufferAttribute(c3, 3));
+    stkGeo.setAttribute('aDisk', new THREE.BufferAttribute(d3, 3));
+    stkGeo.setAttribute('aRnd', new THREE.BufferAttribute(r4, 4));
+    stkGeo.setAttribute('aTail', new THREE.BufferAttribute(tl, 1));
+  }
+  const stkU = Object.assign({}, cloudU, { uImpT: { value: 0 }, uGT: { value: 0 }, uStreak: { value: 0 } });
+  const stkMat = new THREE.ShaderMaterial({
+    uniforms: stkU,
+    vertexShader: /* glsl */ `
+      attribute vec3 aCyl; attribute vec3 aDisk; attribute vec4 aRnd; attribute float aTail;
+      uniform float uImpT, uGT, uStreak;
+      float IMP; float GROT;
+      ${CLOUD_BODY}
+      varying vec3 vCol;
+      void main(){
+        IMP = mix(uImp, uImpT, aTail); GROT = mix(uG, uGT, aTail);
+        vec3 col; float vis;
+        vec3 p = cloudPos(aCyl, aDisk, aRnd, col, vis);
+        float k = pow(uImp, 1.7);
+        vec3 hc = mix(vec3(1.0, 0.55, 0.25), vec3(0.85, 0.9, 1.0), k);
+        vCol = hc * (1.0 - aTail) * uStreak * (0.35 + 0.65 * aRnd.x);
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
+      }`,
+    fragmentShader: /* glsl */ `varying vec3 vCol; void main(){ gl_FragColor = vec4(vCol, 1.0); }`,
+    blending: THREE.AdditiveBlending, depthWrite: false, depthTest: true, transparent: true,
+  });
+  const streaks = new THREE.LineSegments(stkGeo, stkMat);
+  streaks.frustumCulled = false;
+  streaks.visible = false;
+  scene.add(streaks);
 
   // haze: a random subset re-drawn with large soft sprites into a quarter-res target
   const hazeScene = new THREE.Scene();
@@ -326,14 +374,14 @@ export function buildCosmos(ctx, scene) {
   scene.add(ring);
 
   // ---------------------------------------------------------------- the star
-  const starU = { uT: { value: 0 }, uTemp: { value: 5778 }, uI: { value: 4 }, uHot: { value: 0 }, uGran: { value: 1 } };
+  const starU = { uT: { value: 0 }, uTemp: { value: 5778 }, uI: { value: 4 }, uHot: { value: 0 }, uGran: { value: 1 }, uSpot: { value: Array.from({ length: 6 }, () => new THREE.Vector4(0, 0, 0, 0)) } };
   const starMat = new THREE.ShaderMaterial({
     uniforms: starU,
     vertexShader: /* glsl */ `
       varying vec3 vN; varying vec3 vVN; varying vec3 vVP;
       void main(){ vN = normal; vVN = normalMatrix * normal; vec4 mv = modelViewMatrix * vec4(position, 1.0); vVP = mv.xyz; gl_Position = projectionMatrix * mv; }`,
     fragmentShader: /* glsl */ `
-      uniform float uT, uTemp, uI, uHot, uGran;
+      uniform float uT, uTemp, uI, uHot, uGran; uniform vec4 uSpot[6];
       varying vec3 vN; varying vec3 vVN; varying vec3 vVP;
       ${glsl.hash}
       ${glsl.simplex3}
@@ -359,18 +407,40 @@ export function buildCosmos(ctx, scene) {
         // slow differential rotation of the photosphere
         float rot = t * 0.012;
         vec3 q = vec3(n.x * cos(rot) - n.z * sin(rot), n.y, n.x * sin(rot) + n.z * cos(rot));
-        vec3 wp = q * 3.0;
-        vec3 warp = vec3(snoise(wp + t * 0.05), snoise(wp + 13.0 - t * 0.04), 0.0);
-        vec2 w1 = worley(q * 15.0 + warp * 0.7, t * 0.45);
-        float fine = snoise(q * 70.0 + warp * 2.0 + t * 0.1);
-        float cell = (1.0 - smoothstep(0.0, 0.95, w1.x)) * 0.6 + smoothstep(0.0, 0.3, w1.y - w1.x) * 0.25 + (0.5 + 0.5 * fine) * 0.15;
-        float sup = snoise(q * 5.0 + warp * 0.6 + t * 0.02) * 0.6;
-        float gran = mix(1.0, 0.6 + 0.62 * cell, uGran) * (1.0 + 0.32 * sup * uGran);
-        // faculae: bright magnetic network near the limb
-        float fac = smoothstep(0.35, 0.8, snoise(q * 7.0 + 3.1)) * (1.0 - mu) * 0.6;
-        // limb darkening (quadratic law) and limb reddening
+        // two-octave domain warp so the cells are irregular, stretched and sheared
+        vec3 wp = q * 2.6;
+        vec3 warp = vec3(snoise(wp + t * 0.05), snoise(wp + 13.0 - t * 0.04), snoise(wp + 27.0)) ;
+        warp += 0.45 * vec3(snoise(q * 7.0 + warp + 3.0), snoise(q * 7.0 - warp + 9.0), 0.0);
+        // granules (small, fast) inside a supergranular network (large, slow)
+        vec2 w1 = worley(q * 19.0 + warp * 1.25, t * 0.5);
+        vec2 w2 = worley(q * 6.0 + warp * 0.5 + 11.0, t * 0.12);
+        float fine = snoise(q * 80.0 + warp * 3.0 + t * 0.1);
+        float gc = 1.0 - smoothstep(0.05, 0.9, w1.x);
+        float lane = smoothstep(0.0, 0.22, w1.y - w1.x);
+        float net = smoothstep(0.0, 0.18, w2.y - w2.x);
+        float cell = gc * 0.55 * (0.75 + 0.5 * fract(dot(floor(q * 19.0 + warp * 1.25), vec3(0.37, 0.71, 0.13)) * 7.0)) + lane * 0.25 + (0.5 + 0.5 * fine) * 0.12;
+        cell *= 0.82 + 0.18 * net;
+        float sup = snoise(q * 4.0 + warp * 0.6 + t * 0.02) * 0.5;
+        float gran = mix(1.0, 0.55 + 0.7 * cell, uGran) * (1.0 + 0.28 * sup * uGran);
+        // faculae: bright magnetic network near the limb (on the supergranule boundaries)
+        float fac = (1.0 - net) * smoothstep(0.1, 0.7, snoise(q * 6.0 + 3.1)) * pow(1.0 - mu, 1.5) * 0.9;
+        // sunspot groups: dark umbra, filamentary penumbra
+        float spot = 1.0;
+        for (int i = 0; i < 6; i++){
+          vec4 sp = uSpot[i];
+          if (sp.w <= 0.0) continue;
+          float th = sqrt(max(2.0 * (1.0 - dot(q, sp.xyz)), 0.0)) / sp.w;
+          vec3 tq = q - sp.xyz;
+          float ang = atan(dot(tq, normalize(cross(sp.xyz, vec3(0.0, 1.0, 0.0)))), tq.y);
+          float fil = 0.7 + 0.3 * snoise(vec3(cos(ang) * 9.0, sin(ang) * 9.0, th * 2.5 + float(i) * 7.0));
+          float pen = 1.0 - smoothstep(0.75, 1.0, th + 0.08 * snoise(q * 30.0));
+          float umb = 1.0 - smoothstep(0.3, 0.45, th + 0.06 * snoise(q * 55.0));
+          spot *= mix(1.0, 0.52 * fil, pen) * mix(1.0, 0.12, umb);
+        }
+        gran *= spot;
+        // limb darkening (strong quadratic law) and limb reddening
         float om = 1.0 - mu;
-        float limb = 1.0 - 0.62 * om - 0.22 * om * om;
+        float limb = 1.0 - 0.78 * om - 0.12 * om * om;
         // photosphere colour ramp: cool red-orange lanes -> golden cells -> pale-yellow hot centre
         float x = limb * gran * (1.0 + fac);
         vec3 coolC = vec3(0.9, 0.2, 0.035), midC = vec3(1.0, 0.56, 0.17), hotC = vec3(1.0, 0.9, 0.7);
@@ -487,7 +557,7 @@ export function buildCosmos(ctx, scene) {
   scene.add(stars);
 
   return {
-    cloud, cloudU, embers, emberU, haze, hazeU, hazeScene, hazeRT, hazeComp, NH, NC,
+    cloud, cloudU, streaks, stkU, embers, emberU, haze, hazeU, hazeScene, hazeRT, hazeComp, NH, NC,
     core, coreU, flash, flashU, ring, ringU, star, starU, corona, coronaU, prom, promU, stars, starsU,
   };
 }

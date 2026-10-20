@@ -373,18 +373,18 @@ def build(tl):
     # IGNITION: the one Hollywood moment
     mx.add('sfx', IGN, X.sub_drop(7.5, 'ign'), -19.0)
     mx.add('sfx', IGN, X.boom(1.6, 'ign'), -15.0, sends={'hall': 0.15})
-    mx.add('sfx', IGN, X.impact_burst(5.0, 'ign'), -12.0, sends={'space': 0.7, 'hall': 0.2})
+    mx.add('sfx', IGN, X.impact_burst(5.0, 'ign'), -13.5, sends={'space': 0.7, 'hall': 0.2})
     mx.add('sfx', IGN + 0.05, X.whoosh(2.4, 'shock', peak=0.22, f_lo=300, f_hi=6500, width_oct=1.3,
-                                       pan_from=-0.9, pan_to=0.9, attack_pow=0.7), -12.0, sends={'space': 0.4})
+                                       pan_from=-0.9, pan_to=0.9, attack_pow=0.7), -16.0, sends={'space': 0.4})
     full = ['D2', 'A2', 'D3', 'F3', 'A3', 'E4', 'A4', 'D5', 'E5', 'A5']
-    sp = [(IGN, -110), (IGN + 0.06, -2), (IGN + 1.0, -6), (IGN + 2.5, -10), (IGN + 5.0, -9), (C['star_hud_2'] - 0.3, -10),
+    sp = [(IGN, -110), (IGN + 0.06, -3.5), (IGN + 1.0, -7), (IGN + 2.5, -10), (IGN + 5.0, -9), (C['star_hud_2'] - 0.3, -10),
           (C['star_hud_2'] + 1.5, -110)]
     chord(mx, full, IGN, C['star_hud_2'] + 1.5, gain=-3.0, env=sp, label='ign')
     n = ns(12.0)
     oc = np.interp(tvec(n), [0, 0.1, 3, 12], [0.2, 1.0, 0.35, 0.15])
     br = I.brass_pad(['D2', 'A2', 'D3', 'F3', 'A3'], n, 'ign', oc)
     br *= Adb(n, IGN, [(IGN, -110), (IGN + 0.05, 0), (IGN + 3, -10), (IGN + 9, -13), (IGN + 12, -110)])
-    mx.add('music', IGN, widen(br, 'brass', 0.5), -13.0, sends={'hall': 0.3, 'space': 0.35})
+    mx.add('music', IGN, widen(br, 'brass', 0.5), -15.0, sends={'hall': 0.3, 'space': 0.35})
     n = ns(9.0)
     gl_ = I.glass('A6', n, 'ign1', beat=0.5) + I.glass('D7', n, 'ign2', beat=0.35)
     gl_ *= Adb(n, IGN, [(IGN, -110), (IGN + 0.03, -30), (IGN + 3, -38), (IGN + 9, -110)])
@@ -537,7 +537,7 @@ def build(tl):
     tt = fa + tvec(n)
     cand_g = Adb(n, fa, [(fa, -110), (FC, -110), (FC + 0.5, -21), (TR, -21), (TR + 4, -26), (cas0 - 1, -27),
                          (cas0 + 1, -36), (CR - 0.06, -36), (CR, -19), (ch3i - 0.56, -19), (ch3i - 0.5, -110),
-                         (CRE - 0.5, -110), (CRE + 2.0, -23), (LS, -21), (CB, -18)])
+                         (CRE - 0.5, -110), (CRE + 2.0, -23), (LS, -22), (CB, -21)])
     cand_p = np.interp(tt, [FC, TR, TR + 4, CR - 0.01, CR, ch3i - 0.5, CRE, LS, CB],
                        [0.0, 0.0, -0.65, -0.65, 0.0, 0.0, -0.55, -0.4, -0.3])
     cand_p += 0.04 * smooth_noise(n, 0.2, rng_for('cpan'))
@@ -683,8 +683,8 @@ def build(tl):
     jit = 2.0 * smooth_noise(n, 3.0, vrng) * ease((tt - WS0) / 3.0)
     fvoice = 440.0 * 2 ** ((pm - 69) / 12.0) * 2 ** ((drift + vib + jit) / 1200.0)
     amp = Adb(n, v0, [(v0, -110), (v0 + 2.0, -6), (WS0, -6), (WS0 + 2.5, -4), (WS1 - 2, -2), (WS1, -5),
-                      (C['card_c4a_out'] - 0.5, -8), (LF, -5), (CRE, -7), (LS, -4), (LS + 4, -2), (BS, -1),
-                      (CB, 2)])
+                      (C['card_c4a_out'] - 0.5, -8), (LF, -5), (CRE, -7), (LS, -4), (LS + 4, -2.5), (BS, -2.5),
+                      (CB, -2)])
     # bow-change micro dips
     for t, *_ in line[2:]:
         amp *= 1 - 0.18 * np.exp(-((tt - t) / 0.05) ** 2)
@@ -709,7 +709,7 @@ def build(tl):
     F2 = F2 / (np.std(F2) * 4.0)
     F2 = eq(F2, [('lowshelf', 300.0, 0.7, 3.0), ('highshelf', 5000.0, 0.7, -3.0)])
     xw = ease((to - WS0) / (WS1 - WS0))
-    worig = Adb(no, DS - 1.0, [(DS - 1.0, -110), (DS, -25), (WS0, -25), (LF, -23), (CRE, -24), (LS, -21), (CB, -18)])
+    worig = Adb(no, DS - 1.0, [(DS - 1.0, -110), (DS, -25), (WS0, -25), (LF, -23), (CRE, -24), (LS, -22), (CB, -21)])
     warm = (Dorig * np.cos(xw * np.pi / 2) + F2 * np.sin(xw * np.pi / 2)) * worig
     mx.add('ambience', DS - 1.0, pan(warm, np.interp(to, [DS, LF, CRE + 2], [0.08, 0.08, 0.35])), 0.0,
            {'room': 0.2, 'hall': 0.05})
@@ -731,18 +731,18 @@ def build(tl):
         gap = 0.27 * hper(t)
         for j, (dt, s) in enumerate(((0.0, 1.0), (gap, 0.6))):
             if t + dt < CB:
-                mx.add('music', t + dt, X.heartbeat_hit(f'hb3{k}{j}', s), -22.0 + 6.0 * x, 0.0, {'hall': 0.04})
+                mx.add('music', t + dt, X.heartbeat_hit(f'hb3{k}{j}', s), -22.0 + 4.0 * x, 0.0, {'hall': 0.04})
     prog = [(CRE, ['D3', 'A3', 'F4']), (LS, ['Bb2', 'F3', 'A3', 'D4']), (LS + 3.0, ['C3', 'G3', 'E4', 'D5']),
             (LS + 5.0, ['Bb2', 'G3', 'D4', 'F4']), (BS, ['A2', 'E3', 'D4', 'G4', 'A4']),
             (BS + 1.5, ['A2', 'E3', 'C#4', 'G4', 'Bb4', 'E5'])]
-    sgain = lambda t: float(np.interp(t, [CRE, LS, BS, CB], [-21.0, -16.0, -11.0, -6.0]))
+    sgain = lambda t: float(np.interp(t, [CRE, LS, BS, CB], [-21.0, -17.5, -14.5, -11.5]))
     for i, (ts, notes) in enumerate(prog):
         te = prog[i + 1][0] if i + 1 < len(prog) else CB
         att = 2.0 if i == 0 else 0.5
         chord(mx, notes, ts - (0 if i == 0 else 0.25), te + 0.3, att=att, rel=0.6, gain=sgain(ts), spread=0.8,
               label=f'two{i}', voices=4)
     # rising high violins on the bridge
-    strings(mx, 'E5', BS - 0.5, CB, att=2.0, rel=0.4, gain=-16.0, p=0.2, voices=5, spread=0.8, label='bridgeV',
+    strings(mx, 'E5', BS - 0.5, CB, att=2.0, rel=0.4, gain=-21.0, p=0.2, voices=5, spread=0.8, label='bridgeV',
             fcurve=lambda t: hz('E5') * 2 ** (5 / 12 * ease((t - BS) / (CB - BS))))
     s_bright += [(CRE - 1, 0.2), (CRE, 0.2), (LS, 0.4), (BS, 0.7), (CB, 1.0)]
     s_space += [(CRE - 1, 0.1), (CB, 0.15)]
@@ -757,7 +757,7 @@ def build(tl):
                 continue
             nt = chs[(k * 2 + j) % len(chs)]
             m = midi(nt) + (12 if (k + j) % 3 == 2 else 0) + (12 if midi(nt) < 50 else 0)
-            pno(mx, t + dt, m, 0.3 + 0.45 * x, ring=1.6, held=0.8, gain=-16.0 + 4 * x, p=-0.45, label='arp3')
+            pno(mx, t + dt, m, 0.3 + 0.45 * x, ring=1.6, held=0.8, gain=-16.0 + 2 * x, p=-0.45, label='arp3')
     mx.add('ambience', LS, X.wind_gust(3.8, 'lean', -0.5, 0.45), -27.0, sends={'hall': 0.3})
     rs = X.reverse_swell(CB - BS + 0.0, 'bridge', 1500.0, 14000.0, end_fade=0.002)
     mx.add('sfx', BS, rs, -24.0, sends={'hall': 0.1})

@@ -130,11 +130,11 @@ export function buildEarth(ctx, scene, { E, patchN }) {
   const lightGeo = new THREE.BufferGeometry();
   lightGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(pts), 3));
   lightGeo.setAttribute('aC', new THREE.BufferAttribute(new Float32Array(cols), 4));
-  const lightU = { uSun: sunU, uI: { value: 1 }, uS: { value: ctx.S }, uPx: { value: 1.6 } };
+  const lightU = { uSun: sunU, uI: { value: 1 }, uS: { value: ctx.S }, uPx: { value: 1.6 }, uPatch: { value: pn.clone() }, uFocus: { value: 0 } };
   const lights = new THREE.Points(lightGeo, new THREE.ShaderMaterial({
     uniforms: lightU,
     vertexShader: /* glsl */ `
-      attribute vec4 aC; uniform vec3 uSun; uniform float uI, uPx; ${POINT_VS} varying vec3 vCol;
+      attribute vec4 aC; uniform vec3 uSun, uPatch; uniform float uI, uPx, uFocus; ${POINT_VS} varying vec3 vCol;
       void main(){
         vec3 n = normalize(position);
         float night = smoothstep(0.12, -0.1, dot(n, uSun));
@@ -143,7 +143,8 @@ export function buildEarth(ctx, scene, { E, patchN }) {
         float facing = smoothstep(0.0, 0.25, dot(normalize((modelMatrix * vec4(n, 0.0)).xyz), V));
         vec4 mv = viewMatrix * w;
         gl_PointSize = pointSize(uPx * (0.8 + aC.a * 0.6));
-        vCol = aC.rgb * aC.a * uI * night * facing * vAlphaK * 1.6;
+        float focus = mix(1.0, smoothstep(0.93, 0.99, dot(n, uPatch)), uFocus);
+        vCol = aC.rgb * aC.a * uI * night * facing * focus * vAlphaK * 1.6;
         gl_Position = projectionMatrix * mv;
       }`,
     fragmentShader: /* glsl */ `${POINT_FS} varying vec3 vCol; void main(){ gl_FragColor = vec4(vCol * spriteMask(2.5), 1.0); }`,

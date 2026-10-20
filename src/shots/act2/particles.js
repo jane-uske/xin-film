@@ -102,15 +102,15 @@ export function makeParticles(ctx) {
         const t = T - ts - s.tb;
         if (t < 0 || t > s.life) continue;
         const k = 3.2, gy = -70;
-        for (let j = 0; j < 14; j++) {
-          const tt = Math.max(0, t - j * 0.0105);
+        for (let j = 0; j < 30; j++) {
+          const tt = Math.max(0, t - j * 0.0048);
           const e = (1 - Math.exp(-k * tt)) / k;
           const x = origin[0] + s.v[0] * e + 0.3 * Math.sin(tt * 30 + s.wob);
           const y = origin[1] + s.v[1] * e + (gy / k) * (tt - e);
           const z = origin[2] + s.v[2] * e;
           const age = t / s.life;
           const heat = (1 - age) * s.heat;
-          const a = (1 - j / 14) * (1 - age * age) * 9 * heat;
+          const a = (1 - j / 30) * (1 - age * age) * 5 * heat;
           push(x, y, z, a, a * (0.35 + 0.45 * heat), a * 0.12 * heat, j === 0 ? 2.6 : 1.8);
         }
       }

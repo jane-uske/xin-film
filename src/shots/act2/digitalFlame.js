@@ -49,6 +49,12 @@ void main(){
   // 弦长分摊：这一列点的总和 = 烛火同一位置的亮度
   float chord = 2.0 * sqrt(max(1.0 - u * u, 0.0)) * w / uCell.z;
   float lv = rn3 < 1.0 ? I / max(chord, 1.0) : 0.0;
+  // 焰尖：沿中心线伸出的一缕（与烛火的焰尖同一个式子），只占中间一层深度
+  float wt = max(w, 0.05);
+  vec2 dq = p.xz - c;
+  float tipI = smoothstep(0.80, 0.97, s) * (1.0 - smoothstep(1.0, 1.14, s)) * smoothstep(0.9, 0.2, abs(dot(dq, right)) / wt) * 0.3;
+  float slab = step(abs(dot(dq, dv)), wt);
+  lv += floor(tipI / Imax * uQ * 3.0 + 0.5) / (uQ * 3.0) * Imax * slab * uCell.z / (2.0 * wt);
   if (lv < 0.004 || uFade <= 0.0) { kill(); return; }
   vec3 h = hash33(position * 17.31 + 3.1) - 0.5;
   p += h * uCell * uSoft * 1.4;
@@ -56,7 +62,7 @@ void main(){
   vec4 mv = viewMatrix * vec4(wp, 1.0);
   gl_Position = projectionMatrix * mv;
   float size = uCell.x * uPx / max(-mv.z, 0.1);
-  float ps = size * mix(mix(uSize, 0.98, uVox), 3.2, uSoft);
+  float ps = size * mix(mix(uSize, 0.98, uVox), 2.2, uSoft);
   gl_PointSize = clamp(ps, uMinPx, 80.0);
   vec3 cool = digPalette(heat + 0.25 * (1.0 - step(1.0, rn3)) * 0.0);
   vec3 white = vec3(0.95, 0.95, 0.96);
@@ -64,7 +70,7 @@ void main(){
   float Ep = lv * uGain * uFade;
   // 点比像素还小时，按面积守恒
   Ep *= clamp(ps * ps / (gl_PointSize * gl_PointSize), 0.0, 1.0);
-  Ep /= mix(1.0, 7.0, uSoft);
+  Ep /= mix(1.0, 14.0, uSoft);
   vCol = col * Ep * (1.0 + uFlash);
   vVox = uVox; vSoft = uSoft;
 }`;

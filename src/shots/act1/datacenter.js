@@ -13,80 +13,100 @@ export function buildDatacenter(ctx) {
 
   // ---------------------------------------------------------------- layout (mm)
   const RW = 600, RD = 1100, RH = 2000, AISLE = 1200, PITCHZ = RD + AISLE;
-  const COLS = 40, ROWS = 14;
+  const COLS = 64, ROWS = 14;
   // GPU slot (column 0, row 1) of the server tray holds our die
   const slotU = [0.3, 0.7], slotV = [0.3, 0.42, 0.54, 0.66];
   const rack0 = [-(slotU[0] - 0.5) * RW, -2, -(slotV[1] - 0.5) * RD]; // rack-top centre relative to the die
-  const i0 = 20, j0 = 6;
+  const i0 = 14, j0 = 6;
   const hall0 = [rack0[0] - i0 * RW, -RH, rack0[2] - j0 * PITCHZ];
-  const HALLX = COLS * RW, HALLZ = ROWS * PITCHZ, GAP = 5000;
+  const HALLX = COLS * RW, HALLZ = ROWS * PITCHZ, GAP = 2 * PITCHZ;
   const halls = [[0, 0], [HALLX + GAP, 0], [0, HALLZ + GAP], [HALLX + GAP, HALLZ + GAP]];
   const BLD = { x0: hall0[0] - 2500, x1: hall0[0] + 2 * HALLX + GAP + 2500, z0: hall0[2] - 2500, z1: hall0[2] + 2 * HALLZ + GAP + 2500 };
   const FLOOR = -RH - 2;
+
+  // shared: heat fog by view distance (warm air hanging in the hall)
+  const U = { uT: { value: 0 }, uLoad: { value: 1 }, uFog: { value: 0 }, uFogH: { value: 0.13 } };
+  const FOG_VS = /* glsl */ `varying float vDist;`;
+  const FOG_FS = /* glsl */ `uniform float uFog, uFogH; varying float vDist;
+    float fogged(float h){ return mix(h, uFogH, 1.0 - exp(-vDist * uFog)); }`;
 
   // ---------------------------------------------------------------- racks (instanced)
   const N = halls.length * COLS * ROWS;
   const rackGeo = new THREE.BoxGeometry(1, 1, 1);
   const seeds = new Float32Array(N * 4);
-  const U = { uT: { value: 0 }, uLoad: { value: 1 } };
   const rackMat = new THREE.ShaderMaterial({
     uniforms: U,
     vertexShader: /* glsl */ `
-      attribute vec4 aR; varying vec3 vN; varying vec2 vUv; varying vec4 vR;
-      void main(){ vN = normal; vUv = uv; vR = aR; gl_Position = projectionMatrix * viewMatrix * modelMatrix * instanceMatrix * vec4(position, 1.0); }`,
+      attribute vec4 aR; varying vec3 vN; varying vec2 vUv; varying vec4 vR; ${FOG_VS}
+      void main(){ vN = normal; vUv = uv; vR = aR; vec4 mv = viewMatrix * modelMatrix * instanceMatrix * vec4(position, 1.0); vDist = -mv.z; gl_Position = projectionMatrix * mv; }`,
     fragmentShader: /* glsl */ `
       uniform float uT, uLoad; varying vec3 vN; varying vec2 vUv; varying vec4 vR;
+      ${FOG_FS}
       ${glsl.hash}
       float box(vec2 p, vec2 c, vec2 h){ vec2 d = abs(p - c) - h; return step(max(d.x, d.y), 0.0); }
-      // antialias a pattern by blending to its mean once it gets close to pixel size
-      float lod(float v, float mean, vec2 uv, float f){ float w = max(fwidth(uv.x * f), fwidth(uv.y * f)); return mix(v, mean, smoothstep(0.25, 0.9, w)); }
+      // fade a pattern to its mean as it approaches pixel size (no shimmering at distance)
+      float aa(vec2 uv, float f){ float w = max(fwidth(uv.x * f), fwidth(uv.y * f)); return 1.0 - smoothstep(0.25, 0.9, w); }
       void main(){
         vec3 n = vN; vec2 uv = vUv;
+        float load = (0.7 + 0.45 * vR.z) * uLoad;
         float h;
         if (n.y > 0.5){
-          // open server tray from above: board, 8 GPU packages (die + 6 HBM), front fans, rear PSUs
+          // open GPU tray seen from above: 8 packages (die, HBM), VRMs, rear PSUs
           vec2 p = vec2(uv.x, 1.0 - uv.y);
           vec2 mm = (p - 0.5) * vec2(600.0, 1100.0);
-          float load = (0.75 + 0.35 * vR.z) * uLoad;
-          // board with small components (hashed cells) and copper pours
-          vec2 cell = floor(mm / 9.0);
-          float comp = step(0.82, hash21(cell + vR.x * 31.0)) * 0.06;
           float pk = 0.0, die = 0.0, hbm = 0.0, glow = 0.0, vrm = 0.0;
           for (int i = 0; i < 2; i++) for (int j = 0; j < 4; j++){
-            vec2 c = vec2(i == 0 ? 0.3 : 0.7, 0.3 + 0.12 * float(j));
-            vec2 cm = (c - 0.5) * vec2(600.0, 1100.0);
+            vec2 cm = (vec2(i == 0 ? 0.3 : 0.7, 0.3 + 0.12 * float(j)) - 0.5) * vec2(600.0, 1100.0);
             vec2 d = mm - cm;
             pk = max(pk, box(mm, cm, vec2(45.0, 45.0)));
             die = max(die, box(mm, cm, vec2(13.0, 13.0)));
             hbm = max(hbm, box(mm, cm + vec2(-26.0, 0.0), vec2(6.0, 24.0)) + box(mm, cm + vec2(26.0, 0.0), vec2(6.0, 24.0)));
             vrm = max(vrm, box(mm, cm + vec2(0.0, 58.0), vec2(40.0, 6.0)));
-            glow += exp(-dot(d, d) / 2600.0);
+            glow += exp(-dot(d, d) / 3000.0);
           }
-          float fans = box(p, vec2(0.5, 0.07), vec2(0.46, 0.045)) * (0.6 + 0.4 * sin(p.x * 75.0));
+          float comp = step(0.84, hash21(floor(mm / 9.0) + vR.x * 31.0));
           float psu = box(p, vec2(0.5, 0.93), vec2(0.42, 0.035));
-          float fine = comp + pk * 0.12 + hbm * 0.16 * load + die * 0.22 * load + vrm * 0.2 * load - fans * 0.06 + psu * 0.14;
-          h = 0.12 + glow * 0.3 * load + lod(fine, 0.05 + 0.02 * load, uv, 60.0);
+          float fans = box(p, vec2(0.5, 0.07), vec2(0.46, 0.045));
+          float fine = pk * 0.18 + hbm * 0.3 * load + die * 0.42 * load + vrm * 0.3 * load + comp * 0.05 + psu * 0.55 - fans * 0.04;
+          float k = aa(uv, 60.0);
+          h = 0.035 + glow * 0.5 * load + mix(0.08 + 0.04 * load, fine * 1.3, k);
         } else if (abs(n.z) > 0.5){
+          // 21 x 2U server units
+          float Uf = uv.y * 21.0;
+          float ui = floor(Uf), ur = fract(Uf);
+          float hu = hash21(vec2(ui, vR.x * 113.0));
+          float gpuSled = step(13.0, ui) * step(ui, 18.0);            // hot GPU sleds in the upper middle
+          float slot = smoothstep(0.0, 0.05, ur) * smoothstep(1.0, 0.95, ur);
+          float kU = aa(uv, 21.0), kV = aa(uv, 140.0);
           bool back = n.z < 0.0;
           if (!back){
-            // cold-aisle front: 42 U of servers, status LEDs
-            float U = uv.y * 42.0;
-            float row = fract(U);
-            float led = step(0.05, uv.x) * step(uv.x, 0.11) * step(0.35, row) * step(row, 0.6);
-            float blink = step(0.35, hash21(vec2(floor(U) + vR.x * 97.0, floor(uT * (2.0 + 3.0 * vR.z)))));
-            float seam = 1.0 - smoothstep(0.0, 0.08, row) * smoothstep(1.0, 0.92, row);
-            h = 0.09 + 0.05 * uv.y + seam * 0.03 + led * blink * 0.55;
-            h = lod(h, 0.11 + 0.05 * uv.y, uv, 42.0);
+            // cold-aisle intake: dark bezels, perforated grille, status LEDs
+            float grille = step(0.14, uv.x) * step(uv.x, 0.86) * step(0.18, ur) * step(ur, 0.82);
+            vec2 g = fract(vec2(uv.x * 70.0, Uf * 7.0)) - 0.5;
+            float hole = 1.0 - smoothstep(0.18, 0.3, length(g));
+            float led = (box(vec2(uv.x, ur), vec2(0.06, 0.5), vec2(0.012, 0.09)) + box(vec2(uv.x, ur), vec2(0.09, 0.5), vec2(0.012, 0.09)));
+            float blink = step(0.4, hash21(vec2(ui + vR.x * 97.0, floor(uT * (1.5 + 3.0 * hu)))));
+            float base = 0.08 + 0.05 * hu + 0.05 * gpuSled * load;
+            float v = base + grille * mix(0.02, hole * 0.08, kV);
+            v = mix(base * 0.5, v, mix(1.0, slot, kU));
+            h = mix(base + 0.01, v, kU) + led * blink * 0.6 * kU;
           } else {
-            // hot-aisle exhaust
-            float U = uv.y * 42.0;
-            h = 0.46 + 0.05 * sin(uv.x * 30.0) + 0.05 * step(0.5, fract(U * 0.25)) + 0.1 * uv.y;
-            h = lod(h, 0.52, uv, 20.0);
+            // hot-aisle exhaust: two fans per unit + a PSU column; each unit breathes on its own
+            float breathe = 0.07 * sin(uT * (0.35 + 0.5 * hu) + hu * 31.0) + 0.04 * sin(uT * 1.3 + hu * 11.0);
+            float ex = 0.56 + 0.2 * hu + 0.2 * gpuSled * load + breathe;
+            vec2 f1 = vec2((uv.x - 0.28) * 3.0, ur - 0.5), f2 = vec2((uv.x - 0.6) * 3.0, ur - 0.5);
+            float fr = min(length(f1), length(f2));
+            float fan = (1.0 - smoothstep(0.32, 0.4, fr)) * (0.7 + 0.3 * smoothstep(0.0, 0.25, fr));
+            float psu = step(0.82, uv.x) * step(uv.x, 0.95) * step(0.2, ur) * step(ur, 0.8);
+            float v = ex * (0.62 + 0.38 * fan) + psu * (0.25 + 0.15 * hu);
+            v = mix(ex * 0.45, v, mix(1.0, slot, kU));
+            h = mix(ex * 0.82, v, kU);
+            h += 0.05 * (1.0 - uv.y);
           }
         } else {
-          h = 0.12;
+          h = 0.035 + 0.03 * uv.y;
         }
-        gl_FragColor = vec4(h, 0.0, 0.0, 1.0);
+        gl_FragColor = vec4(fogged(h), 0.0, 0.0, 1.0);
       }`,
   });
   const racks = new THREE.InstancedMesh(rackGeo, rackMat, N);
@@ -110,31 +130,78 @@ export function buildDatacenter(ctx) {
   racks.frustumCulled = false;
   group.add(racks);
 
-  // ---------------------------------------------------------------- flat heat surfaces (floor, walls, yard, ground)
+  // ---------------------------------------------------------------- flat heat surfaces
   const flatMat = (frag) => new THREE.ShaderMaterial({
     uniforms: U,
-    vertexShader: /* glsl */ `varying vec3 vP; varying vec3 vN; void main(){ vec4 w = modelMatrix * vec4(position, 1.0); vP = position; vN = normal; gl_Position = projectionMatrix * viewMatrix * w; }`,
-    fragmentShader: /* glsl */ `uniform float uT; varying vec3 vP; varying vec3 vN; ${glsl.hash} ${glsl.simplex3} ${frag}`,
+    vertexShader: /* glsl */ `varying vec3 vP; varying vec3 vN; ${FOG_VS} void main(){ vec4 w = modelMatrix * vec4(position, 1.0); vP = position; vN = normal; vec4 mv = viewMatrix * w; vDist = -mv.z; gl_Position = projectionMatrix * mv; }`,
+    fragmentShader: /* glsl */ `uniform float uT; varying vec3 vP; varying vec3 vN; ${FOG_FS} ${glsl.hash} ${glsl.simplex3} ${frag}`,
     side: THREE.DoubleSide,
   });
-  // hall floors: hot aisles warm, cold aisles cool
+  // hall floor: warm hot aisles, cold perforated tiles in the cold aisles
   const floorGeo = new THREE.PlaneGeometry(BLD.x1 - BLD.x0, BLD.z1 - BLD.z0);
   floorGeo.rotateX(-Math.PI / 2);
+  const fz0 = ((BLD.z0 + BLD.z1) / 2 - hall0[2]), fx0 = ((BLD.x0 + BLD.x1) / 2 - hall0[0]);
   const floor = new THREE.Mesh(floorGeo, flatMat(/* glsl */ `
-    uniform vec3 uH0; uniform float uPZ;
     void main(){
-      float z = (vP.z + ${(((BLD.z0 + BLD.z1) / 2) - hall0[2]).toFixed(1)}) / ${PITCHZ.toFixed(1)};
-      float hot = step(0.5, fract(z * 0.5 + 0.25));
-      float h = 0.06 + 0.2 * hot;
-      float w = fwidth(z);
-      h = mix(h, 0.12, smoothstep(0.3, 0.9, w));
-      gl_FragColor = vec4(h, 0.0, 0.0, 1.0);
+      float z = (vP.z + ${fz0.toFixed(1)}) / ${PITCHZ.toFixed(1)};
+      float zf = fract(z);
+      // rows sit at integer z (+-RD/2); aisles in between alternate cold (after even rows) and hot
+      float inAisle = smoothstep(0.235, 0.26, zf) * smoothstep(0.765, 0.74, zf);
+      float hot = step(0.5, fract(floor(z) * 0.5));
+      vec2 tile = fract(vec2(vP.x + ${fx0.toFixed(1)}, vP.z + ${fz0.toFixed(1)}) / 600.0);
+      float seam = 1.0 - (smoothstep(0.0, 0.02, tile.x) * smoothstep(1.0, 0.98, tile.x) * smoothstep(0.0, 0.02, tile.y) * smoothstep(1.0, 0.98, tile.y));
+      vec2 pf = fract(vec2(vP.x, vP.z) / 60.0) - 0.5;
+      float perf = 1.0 - smoothstep(0.15, 0.25, length(pf));
+      float w = fwidth(vP.x / 600.0);
+      float k = 1.0 - smoothstep(0.25, 0.9, w), kp = 1.0 - smoothstep(0.25, 0.9, w * 10.0);
+      float cold = 0.025 - 0.012 * perf * kp + 0.015 * seam * k;
+      float warm = 0.4 + 0.04 * seam * k;
+      float h = mix(0.05, mix(cold, warm, hot), inAisle);
+      gl_FragColor = vec4(fogged(h), 0.0, 0.0, 1.0);
     }`));
   floor.position.set((BLD.x0 + BLD.x1) / 2, FLOOR, (BLD.z0 + BLD.z1) / 2);
   group.add(floor);
 
-  // perimeter + interior walls (roofless: a thermal camera sees the heat through)
-  const wallMat = flatMat(/* glsl */ `void main(){ float h = 0.1 + 0.03 * snoise(vP * 0.0004) + 0.06 * smoothstep(-3500.0, 3500.0, vP.y); gl_FragColor = vec4(h, 0.0, 0.0, 1.0); }`);
+  // cable trays over every cold aisle (ladder trays, faintly warm cables)
+  const trayMat = flatMat(/* glsl */ `
+    void main(){
+      float rung = step(0.85, fract(vP.x / 300.0));
+      float w = fwidth(vP.x / 300.0);
+      float h = mix(0.16 + 0.07 * rung, 0.17, smoothstep(0.25, 0.9, w));
+      gl_FragColor = vec4(fogged(h), 0.0, 0.0, 1.0);
+    }`);
+  for (const [hx, hz] of halls) {
+    for (let j = 0; j < ROWS - 1; j += 2) {
+      const t = new THREE.Mesh(new THREE.BoxGeometry(HALLX, 110, 420), trayMat);
+      t.position.set(hall0[0] + hx + HALLX / 2 - RW / 2, FLOOR + RH + 650, hall0[2] + hz + j * PITCHZ + PITCHZ / 2);
+      group.add(t);
+    }
+  }
+
+  // hot-aisle air: an additive heat volume over every hot aisle (exhaust air pooling and rising)
+  const airMat = new THREE.ShaderMaterial({
+    uniforms: U,
+    vertexShader: /* glsl */ `varying vec3 vP; ${FOG_VS} void main(){ vP = position; vec4 mv = viewMatrix * modelMatrix * vec4(position, 1.0); vDist = -mv.z; gl_Position = projectionMatrix * mv; }`,
+    fragmentShader: /* glsl */ `uniform float uT; varying vec3 vP; ${FOG_FS} ${glsl.simplex3}
+      void main(){
+        float y = vP.y / ${(RH + 1400).toFixed(1)} + 0.5;           // 0 at floor, 1 at the top of the volume
+        float n = snoise(vec3(vP.x * 0.0006, vP.y * 0.001 - uT * 0.5, vP.z * 0.002));
+        float h = 0.14 * (1.0 - smoothstep(0.55, 1.0, y)) * (0.75 + 0.35 * n);
+        gl_FragColor = vec4(h * exp(-vDist * uFog * 0.5), 0.0, 0.0, 1.0);
+      }`,
+    blending: THREE.AdditiveBlending, depthWrite: false, depthTest: true, transparent: true,
+  });
+  for (const [hx, hz] of halls) {
+    for (let j = 1; j < ROWS - 1; j += 2) {
+      const a = new THREE.Mesh(new THREE.BoxGeometry(HALLX, RH + 1400, AISLE * 0.96), airMat);
+      a.position.set(hall0[0] + hx + HALLX / 2 - RW / 2, FLOOR + (RH + 1400) / 2, hall0[2] + hz + j * PITCHZ + PITCHZ / 2);
+      a.renderOrder = 5;
+      group.add(a);
+    }
+  }
+
+  // perimeter walls only (no partitions, so the hall runs on); roofless — the thermal camera sees through
+  const wallMat = flatMat(/* glsl */ `void main(){ float h = 0.09 + 0.03 * snoise(vP * 0.0004) + 0.07 * smoothstep(-3500.0, 3500.0, vP.y); gl_FragColor = vec4(fogged(h), 0.0, 0.0, 1.0); }`);
   const WH = 7000;
   const addWall = (x0, z0, x1, z1, th = 600) => {
     const w = new THREE.Mesh(new THREE.BoxGeometry(Math.max(Math.abs(x1 - x0), th), WH, Math.max(Math.abs(z1 - z0), th)), wallMat);
@@ -143,19 +210,20 @@ export function buildDatacenter(ctx) {
   };
   addWall(BLD.x0, BLD.z0, BLD.x1, BLD.z0); addWall(BLD.x0, BLD.z1, BLD.x1, BLD.z1);
   addWall(BLD.x0, BLD.z0, BLD.x0, BLD.z1); addWall(BLD.x1, BLD.z0, BLD.x1, BLD.z1);
-  const midX = hall0[0] + HALLX + GAP / 2, midZ = hall0[2] + HALLZ + GAP / 2;
-  addWall(midX, BLD.z0, midX, BLD.z1, 400); addWall(BLD.x0, midZ, BLD.x1, midZ, 400);
 
-  // chiller yard along the long side: hot fan decks — the heat leaves here
+  // chiller yard along the long side: fan decks blow the hottest air of the site
   const yard = { x0: BLD.x1 + 6000, x1: BLD.x1 + 22000, z0: BLD.z0 + 4000, z1: BLD.z1 - 4000 };
   const chMat = flatMat(/* glsl */ `
     void main(){
-      float h = 0.2;
+      float h = 0.3;
       if (vN.y > 0.5){
         vec2 c = fract(vP.xz / 2200.0) - 0.5;
-        float fan = 1.0 - smoothstep(0.28, 0.36, length(c));
-        h = 0.42 + 0.45 * fan;
-        h = mix(h, 0.55, smoothstep(0.3, 0.9, fwidth(vP.x / 2200.0)));
+        float r = length(c);
+        float fan = 1.0 - smoothstep(0.26, 0.36, r);
+        h = 0.45 + 0.52 * fan * (0.85 + 0.15 * sin(uT * 2.0 + floor(vP.x / 2200.0) * 3.0));
+        h = mix(h, 0.72, smoothstep(0.3, 0.9, fwidth(vP.x / 2200.0)));
+      } else {
+        h = 0.26 + 0.1 * smoothstep(-1500.0, 1500.0, vP.y);
       }
       gl_FragColor = vec4(h, 0.0, 0.0, 1.0);
     }`);
@@ -242,14 +310,14 @@ export function buildDatacenter(ctx) {
       void main(){
         float life = fract(aP.x + uT * 0.035);
         float y = life * 260000.0;
-        float size = 14000.0 + life * 70000.0 + aP.y * 10000.0;
+        float size = 12000.0 + life * 80000.0 + aP.y * 10000.0;
         vec3 c = vec3(${PLX.toFixed(1)} + (aP.z - 0.5) * 9000.0 + sin(life * 5.0 + aP.w * 6.0) * 6000.0 + life * life * 50000.0,
                       ${(FLOOR + 3000).toFixed(1)} + y,
                       ${PLZ.toFixed(1)} + (aP.w - 0.5) * 9000.0);
         vec4 mv = modelViewMatrix * vec4(c, 1.0);
         mv.xy += position.xy * size * ${MM.toFixed(6)};
         vQ = position.xy * 2.0; vP = aP;
-        vA = smoothstep(0.0, 0.06, life) * (1.0 - smoothstep(0.45, 1.0, life)) * (1.0 - life * 0.7);
+        vA = smoothstep(0.0, 0.04, life) * (1.0 - smoothstep(0.5, 1.0, life)) * 0.3 * pow(1.0 - life, 2.2);
         gl_Position = projectionMatrix * mv;
       }`,
     fragmentShader: /* glsl */ `
@@ -259,8 +327,9 @@ export function buildDatacenter(ctx) {
         float r = length(vQ);
         if (r > 1.0) discard;
         float n = snoise(vec3(vQ * 2.1 + vP.yz * 10.0, uT * 0.18 + vP.w * 4.0));
-        float d = smoothstep(1.0, 0.15, r) * clamp(0.55 + 0.6 * n, 0.0, 1.0);
-        gl_FragColor = vec4(0.0, d * vA * 0.095 * uI, 0.0, 1.0);
+        float core = exp(-r * r * 4.0) * smoothstep(1.0, 0.6, r);
+        float d = core * clamp(0.5 + 0.7 * n, 0.0, 1.0);
+        gl_FragColor = vec4(0.0, d * vA * uI, 0.0, 1.0);
       }`,
     blending: THREE.AdditiveBlending, depthWrite: false, depthTest: true, transparent: true,
   }));
@@ -299,6 +368,6 @@ export function buildDatacenter(ctx) {
 
   return {
     group, racks, U, plU, plume, heatRT, pass, passU,
-    layout: { rack0, hall0, BLD, yard, PLX, PLZ, FLOOR, HALLX, HALLZ, GAP, RW, RD, RH },
+    layout: { rack0, hall0, BLD, yard, PLX, PLZ, FLOOR, HALLX, HALLZ, GAP, RW, RD, RH, PITCHZ },
   };
 }
