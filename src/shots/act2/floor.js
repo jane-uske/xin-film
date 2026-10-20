@@ -19,7 +19,7 @@ export function makeFloor(ctx, shared) {
     uLat: shared.uLat,                // x: 原点 x, y: 间距, z: nx, w: nz
     uLatI: shared.uLatI, uLatCol: shared.uLatCol, uLatFlameY: shared.uLatFlameY,
     uFogK: shared.uFogK, uFogCol: shared.uFogCol,
-    uDim: { value: 1 },
+    uDim: { value: 1 }, uLatFill: shared.uLatFill,
   };
   const mat = new THREE.ShaderMaterial({
     glslVersion: THREE.GLSL3, uniforms: u,
@@ -29,7 +29,7 @@ precision highp float;
 uniform vec3 uFlamePos; uniform float uFlameI; uniform vec3 uFlameCol;
 uniform vec3 uDigPos; uniform float uDigI; uniform vec3 uDigCol;
 uniform vec3 uMatchPos; uniform float uMatchI;
-uniform float uCandleR, uCandleH, uDim;
+uniform float uCandleR, uCandleH, uDim, uLatFill;
 uniform vec2 uPlinth; uniform vec4 uLat; uniform float uLatI, uLatFlameY; uniform vec3 uLatCol;
 ${fogGLSL}
 in vec3 vW; out vec4 o;
@@ -96,6 +96,7 @@ void main(){
     vec3 avg = uLatCol * uLatI * ALB * 0.010 * inside * (1.0 + 2.0 * pow(max(dot(normalize(vec3(0.0, 1.0, 0.0) + V), vec3(0.0, 1.0, 0.0)), 0.0), 30.0));
     col += mix(acc, avg, lod);
   }
+  col += vec3(0.2, 0.62, 1.0) * uLatFill * ALB * 0.35 * smoothstep(-40.0, 10.0, P.x);
   col *= uDim;
   col = applyFog(col, P);
   o = vec4(col, 1.0);
@@ -105,6 +106,6 @@ void main(){
   mesh.rotation.x = -Math.PI / 2;
   mesh.position.set(5000, 0, -5000);
   mesh.frustumCulled = false;
-  mesh.renderOrder = -1;
+  mesh.renderOrder = 5;   // 不透明物体之后画：被蜡烛/底座挡住的像素由深度测试提前丢弃
   return { mesh, u };
 }

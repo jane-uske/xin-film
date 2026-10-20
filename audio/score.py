@@ -250,7 +250,7 @@ def build(tl):
 
     # first star 'ting' + anamorphic air streak
     t = ign[0]
-    mx.add('music', t, I.ting('A6', 6.0, 'first'), -13.0, -0.35, {'space': 0.55})
+    mx.add('music', t, I.ting('A6', 6.0, 'first'), -21.0, -0.35, {'space': 0.55})
     air = X.whoosh(1.8, 'flare1', peak=0.12, f_lo=3500, f_hi=9000, width_oct=0.8, pan_from=-0.5, pan_to=0.3)
     mx.add('sfx', t, air, -40.0, sends={'space': 0.4})
     # hero stars of the constellation: delicate pings inside the shimmer
@@ -258,8 +258,8 @@ def build(tl):
     prng = rng_for('heropan')
     for k, t in enumerate(ign[1:]):
         f = hz(pool[k % len(pool)])
-        mx.add('music', t, X.star_ping(f, f'hero{k}'), -25.0 - 0.15 * k, prng.uniform(-0.7, 0.7),
-               {'space': 0.5})
+        mx.add('music', t, X.star_ping(f, f'hero{k}'), -30.0 - 0.15 * k, prng.uniform(-0.7, 0.7),
+               {'space': 0.4})
     # granular shimmer: accelerating with the stars, then a living star field
     a0, a1 = C['stars_accel_start'], C['stars_accel_end']
     spool = ['D6', 'E6', 'G6', 'A6', 'B6', 'C7', 'D7', 'E7', 'G7', 'A7', 'D8']
@@ -271,7 +271,7 @@ def build(tl):
             return 3.0 * (40.0 / 3.0) ** ((t - a0) / (a1 - a0))
         return max(2.0, 40.0 * np.exp(-(t - a1) / 1.2))
 
-    grain_cloud(mx, 'music', a0 - 0.6, LAND + 0.5, srate, spool, 'stars', (0.02, 0.09), (-41, -33), 0.9,
+    grain_cloud(mx, 'music', a0 - 0.6, LAND + 0.5, srate, spool, 'stars', (0.02, 0.09), (-54, -46), 0.9,
                 {'space': 0.75}, amp_fn=lambda t: 1.0 if t < LAND - 2 else max(0.0, (LAND + 0.5 - t) / 2.5))
     # constellation strokes: one soft tick each
     tpool = ['A7', 'E7', 'D7', 'A7', 'B7', 'E7', 'D8', 'A7', 'E7', 'G7', 'A7', 'D8', 'E7', 'A7']
@@ -336,7 +336,7 @@ def build(tl):
         f = np.full(nn, hz(nt)) * 2 ** (rng_for(f'o{k}').normal(0, 3) / 1200)
         y = I.bowed(f, amp, np.full(nn, 0.25 + 0.45 * x), f'ost{k}', noise=0.05)
         y += 0.5 * np.sin(TAU * hz(nt) / 2 * tt_) * amp * (0.4 + 0.6 * x)
-        gdb = -31.0 + 17.0 * x ** 0.8
+        gdb = -30.0 + 16.0 * x ** 0.8
         mx.add('music', t, y, gdb, 0.0, {'hall': 0.25})
         if t > ost0 + 6.0:   # octave layer joins, panned pair
             y2 = I.bowed(f * 2, amp, np.full(nn, 0.35 + 0.4 * x), f'osu{k}', noise=0.06)
@@ -345,7 +345,7 @@ def build(tl):
     n = ns(IMP + 0.1 - COL)
     rum = X.rumble(n, 'collapse', lambda t: 55.0 * (500.0 / 55.0) ** np.clip(t / (IMP - COL), 0, 1) ** 1.5,
                    lambda t: 0.08 + 1.3 * (t / (IMP - COL)) ** 2)
-    rum *= Adb(n, COL, [(COL, -110), (C['ch1_out'], -40), (COL + 10, -29), (IMP - 0.05, -15), (IMP + 0.1, -110)])
+    rum *= Adb(n, COL, [(COL, -110), (C['ch1_out'], -40), (COL + 10, -28), (IMP - 0.05, -15), (IMP + 0.1, -110)])
     mx.add('ambience', COL, rum, 0.0, sends={'hall': 0.15})
     # low string pad crescendo, heat brightening (dark red -> white)
     pend = IMP + 0.3
@@ -371,19 +371,19 @@ def build(tl):
     mx.automate(['sfx'], [(IMP + 0.34, 0), (IMP + 0.38, -60), (IGN - 0.002, -60), (IGN, 0)])
 
     # IGNITION: the one Hollywood moment
-    mx.add('sfx', IGN, X.sub_drop(7.5, 'ign'), -1.5)
-    mx.add('sfx', IGN, X.boom(1.6, 'ign'), -5.0, sends={'hall': 0.15})
-    mx.add('sfx', IGN, X.impact_burst(5.0, 'ign'), -7.0, sends={'space': 0.7, 'hall': 0.2})
+    mx.add('sfx', IGN, X.sub_drop(7.5, 'ign'), -15.0)
+    mx.add('sfx', IGN, X.boom(1.6, 'ign'), -12.0, sends={'hall': 0.15})
+    mx.add('sfx', IGN, X.impact_burst(5.0, 'ign'), -12.0, sends={'space': 0.7, 'hall': 0.2})
     mx.add('sfx', IGN + 0.05, X.whoosh(2.4, 'shock', peak=0.22, f_lo=300, f_hi=6500, width_oct=1.3,
                                        pan_from=-0.9, pan_to=0.9, attack_pow=0.7), -12.0, sends={'space': 0.4})
     full = ['D2', 'A2', 'D3', 'F3', 'A3', 'E4', 'A4', 'D5', 'E5', 'A5']
-    sp = [(IGN, -110), (IGN + 0.06, 0), (IGN + 2.0, -6), (IGN + 5.0, -5), (C['star_hud_2'] - 0.3, -6),
+    sp = [(IGN, -110), (IGN + 0.06, 0), (IGN + 1.0, -5), (IGN + 2.5, -10), (IGN + 5.0, -9), (C['star_hud_2'] - 0.3, -10),
           (C['star_hud_2'] + 1.5, -110)]
-    chord(mx, full, IGN, C['star_hud_2'] + 1.5, gain=-6.0, env=sp, label='ign')
+    chord(mx, full, IGN, C['star_hud_2'] + 1.5, gain=-3.0, env=sp, label='ign')
     n = ns(12.0)
     oc = np.interp(tvec(n), [0, 0.1, 3, 12], [0.2, 1.0, 0.35, 0.15])
     br = I.brass_pad(['D2', 'A2', 'D3', 'F3', 'A3'], n, 'ign', oc)
-    br *= Adb(n, IGN, [(IGN, -110), (IGN + 0.05, 0), (IGN + 3, -7), (IGN + 9, -10), (IGN + 12, -110)])
+    br *= Adb(n, IGN, [(IGN, -110), (IGN + 0.05, 0), (IGN + 3, -10), (IGN + 9, -13), (IGN + 12, -110)])
     mx.add('music', IGN, widen(br, 'brass', 0.5), -13.0, sends={'hall': 0.3, 'space': 0.35})
     n = ns(9.0)
     gl_ = I.glass('A6', n, 'ign1', beat=0.5) + I.glass('D7', n, 'ign2', beat=0.35)
@@ -396,26 +396,26 @@ def build(tl):
     PB = C['pullback_start']
     n = ns(PB + 1.5 - (IGN + 0.1))
     pl = X.plasma(n, 'star')
-    pl *= Adb(n, IGN + 0.1, [(IGN + 0.1, -110), (IGN + 1.5, -23), (PB - 1, -25), (PB + 1.5, -110)])
+    pl *= Adb(n, IGN + 0.1, [(IGN + 0.1, -110), (IGN + 1.5, -26), (PB - 1, -27), (PB + 1.5, -110)])
     mx.add('ambience', IGN + 0.1, pl, 0.0, sends={'hall': 0.12})
     bb = ['Bb1', 'F2', 'Bb2', 'D3', 'A3', 'C4', 'F4', 'A4', 'D5']
     t = C['star_hud_2']
-    chord(mx, bb, t - 0.3, PB + 0.8, att=2.2, rel=1.8, gain=-11.0, label='bb')
-    chord(mx, ['C2', 'G2', 'C3', 'G3', 'D4', 'G4', 'C5'], PB, C['earth_arrive'] + 0.3, att=1.5, rel=1.2, gain=-12.0,
+    chord(mx, bb, t - 0.3, PB + 0.8, att=2.2, rel=1.8, gain=-13.0, label='bb')
+    chord(mx, ['C2', 'G2', 'C3', 'G3', 'D4', 'G4', 'C5'], PB, C['earth_arrive'] + 0.3, att=1.5, rel=1.2, gain=-13.0,
           label='csus')
     for t, kind in ((C['star_hud_1'], 'line'), (C['star_hud_1'] + 0.25, 'text'), (C['star_hud_2'], 'text')):
         mx.add('sfx', t, X.hud_blip(f'hud{t}', kind), -31.0, -0.35, {'room': 0.2})
 
     # pull-back: the film's only fast move
     mx.add('sfx', PB - 0.3, X.whoosh(4.4, 'pullback', peak=0.35, f_lo=140, f_hi=2600, width_oct=1.4,
-                                     pan_from=-0.35, pan_to=0.35, attack_pow=1.3), -11.0, sends={'hall': 0.3})
+                                     pan_from=-0.35, pan_to=0.35, attack_pow=1.3), -14.0, sends={'hall': 0.3})
     EA, SU, CD, BF = C['earth_arrive'], C['sunrise'], C['city_dive'], C['brain_form']
     n = ns(BF - PB)
     ab = X.air_bed(n, 'earth')
     ab *= Adb(n, PB, [(PB, -110), (PB + 2, -38), (EA, -31), (CD, -33), (BF, -110)])
     mx.add('ambience', PB, ab, 0.0, sends={'hall': 0.3})
     # modulation to the Dorian IV: G/D, the living B natural
-    chord(mx, ['D2', 'G2', 'D3', 'B3', 'D4', 'A4', 'B4', 'G5'], EA, CD + 0.6, att=1.2, rel=1.6, gain=-12.0,
+    chord(mx, ['D2', 'G2', 'D3', 'B3', 'D4', 'A4', 'B4', 'G5'], EA, CD + 0.6, att=1.2, rel=1.6, gain=-14.0,
           label='earth')
     s_bright += [(EA, 0.6), (CD, 0.45), (BF, 0.3)]
     s_space += [(EA, 0.4), (CD, 0.2)]
@@ -474,7 +474,7 @@ def build(tl):
         m = ext[idx]
         bright = 0.15 + 0.75 * x if not in_card else 0.35
         acc = 1.0 if k % 4 == 0 else 0.75
-        g = -24.0 + 6.0 * x
+        g = -23.0 + 6.0 * x
         if in_card:
             g = -27.0 - 9.0 * np.clip((t - (c1o - 2.0)) / (AF - (c1o - 2.0)), 0, 1) ** 1.5
         y = I.pluck(m, 0.6, bright, f'arp{k}')
@@ -487,7 +487,7 @@ def build(tl):
             rt = midi(roots[min(bar, len(roots) - 1)])
             yb = I.pluck(rt, 0.4, 0.15, f'bass{k}', pw_odd=0.2)
             yb += 0.6 * np.sin(TAU * hz(rt) * tvec(len(yb))) * np.exp(-tvec(len(yb)) / 0.18)
-            gb = -18.0 if not in_card else -22.0 - 8 * np.clip((t - (c1o - 2.0)) / (AF - (c1o - 2.0)), 0, 1)
+            gb = -15.0 if not in_card else -22.0 - 8 * np.clip((t - (c1o - 2.0)) / (AF - (c1o - 2.0)), 0, 1)
             mx.add('music', t, yb, gb, 0.0, {'hall': 0.1})
         k += 1
         t = SS + k * sixteenth
@@ -508,8 +508,8 @@ def build(tl):
     load = 0.35 + 0.65 * np.clip(load, 0, 1)
     coil = X.coil_whine(n, ha, 'dcA', load)
     DR = C['datacenter_reveal']
-    fans *= Adb(n, ha, [(ha, -110), (SS, -50), (DR, -33), (c1i, -25), (HC, -21)])
-    mains_e = Adb(n, ha, [(ha, -110), (SS, -50), (DR, -31), (c1i, -26), (HC, -22)])
+    fans *= Adb(n, ha, [(ha, -110), (SS, -48), (DR, -30), (c1i, -22), (HC, -18)])
+    mains_e = Adb(n, ha, [(ha, -110), (SS, -48), (DR, -28), (c1i, -23), (HC, -19)])
     coil *= Adb(n, ha, [(ha, -110), (SS + 2, -52), (DR, -44), (HC, -38)])
     hum = fans + pan(mains * mains_e, 0.0) + pan(coil, 0.15)
     mx.add('ambience', ha, hum, 0.0, sends={'hall': 0.12})
@@ -598,7 +598,7 @@ def build(tl):
     far = lp(hp(near, 70.0, 2), 650.0, 2)
     far_e = Adb(n, hb0, [(hb0, -110), (C['res_step_2'], -110), (C['res_step_4'], -42), (C['seed_enter'], -44),
                          (C['copy_2'], -40), (cas0 + 1, -110)])
-    near_e = Adb(n, hb0, [(hb0, -110), (C['copy_4'], -110), (cas0, -33), (cas1, -26), (CR - 0.06, -26),
+    near_e = Adb(n, hb0, [(hb0, -110), (C['copy_4'], -110), (cas0, -34), (cas1, -28), (CR - 0.06, -28),
                           (CR, -40), (ch3i - 0.56, -40), (ch3i - 0.5, -27), (WS0 + 4, -28), (LF, -45), (LF + 2, -110)])
     mx.add('ambience', hb0, far * far_e + near * near_e, 0.0, sends={'hall': 0.2})
 
@@ -633,8 +633,8 @@ def build(tl):
     j0 = ns(sa - da)
     seaD = Dg[j0:]
     nsd = len(seaD)
-    sea_g = Adb(nsd, sa, [(sa, -110), (sa + 0.02, -31), (C['copy_4'], -29), (C['copy_8'], -27), (cas1, -24),
-                          (CR - 0.06, -24), (CR, -40), (ch3i - 0.56, -40), (ch3i - 0.5, -25), (LF - 2, -27),
+    sea_g = Adb(nsd, sa, [(sa, -110), (sa + 0.02, -31), (C['copy_4'], -29), (C['copy_8'], -29), (cas1, -27),
+                          (CR - 0.06, -27), (CR, -40), (ch3i - 0.56, -40), (ch3i - 0.5, -25), (LF - 2, -27),
                           (LF + 2, -110)])
     mx.add('ambience', sa, widen(seaD * sea_g, 'sea', 1.0) * 1.2, 0.0, sends={'hall': 0.3})
 
@@ -655,7 +655,7 @@ def build(tl):
     choir_note(mx, 'D3', cas0 + 3.0, chend, [(cas0 + 3.0, -110), (cas1 + 1, -12), (cas1 + 3, -8)] + base, 0.0, -4.0)
     choir_note(mx, 'D5', cas0 + 3.0, chend, [(cas0 + 3.0, -110), (cas1 + 1, -14), (cas1 + 3, -10)] + base, 0.0, -8.0)
     # power: off (gated to digital zero) ... on: relay thunk, everything back, identical
-    mx.add('sfx', PN, X.relay_thunk('on'), -7.0, 0.0, {'room': 0.35, 'hall': 0.12})
+    mx.add('sfx', PN, X.relay_thunk('on'), -10.0, 0.0, {'room': 0.35, 'hall': 0.12})
     # candle return: shorter, marked by time
     pno(mx, CR + 0.5, 'A3', 0.34, ring=5.0, gain=-12.0, p=-0.05)
     pno(mx, CR + 1.7, 'D3', 0.3, ring=5.0, gain=-12.5, p=-0.05)
@@ -693,8 +693,8 @@ def build(tl):
     bright = np.interp(tt, [v0, WS1, CRE, BS, CB], [0.3, 0.45, 0.4, 0.7, 0.9])
     cello = I.bowed(fvoice, amp, bright, 'cello', noise=0.03) * np.sin(wc * np.pi / 2)
     vp = np.interp(tt, [v0, LF, CRE + 2, CB], [0.05, 0.05, 0.3, 0.3])
-    mx.add('music', v0, voice, -2.0, vp, {'hall': 0.45, 'space': 0.1})
-    mx.add('music', v0, cello, -5.0, vp, {'hall': 0.32})
+    mx.add('music', v0, voice, -12.0, vp, {'hall': 0.45, 'space': 0.1})
+    mx.add('music', v0, cello, -24.0, vp, {'hall': 0.32})
     # HUD: lock-on, then failing
     mx.add('sfx', DS + 0.3, X.hud_blip('desync', 'line'), -30.0, 0.1, {'room': 0.2})
     mx.add('sfx', C['hud_glitch'], X.glitch('hud'), -21.0, 0.1, {'hall': 0.15})
@@ -731,18 +731,18 @@ def build(tl):
         gap = 0.27 * hper(t)
         for j, (dt, s) in enumerate(((0.0, 1.0), (gap, 0.6))):
             if t + dt < CB:
-                mx.add('music', t + dt, X.heartbeat_hit(f'hb3{k}{j}', s), -17.0 + 10.0 * x, 0.0, {'hall': 0.04})
+                mx.add('music', t + dt, X.heartbeat_hit(f'hb3{k}{j}', s), -19.0 + 7.0 * x, 0.0, {'hall': 0.04})
     prog = [(CRE, ['D3', 'A3', 'F4']), (LS, ['Bb2', 'F3', 'A3', 'D4']), (LS + 3.0, ['C3', 'G3', 'E4', 'D5']),
             (LS + 5.0, ['Bb2', 'G3', 'D4', 'F4']), (BS, ['A2', 'E3', 'D4', 'G4', 'A4']),
             (BS + 1.5, ['A2', 'E3', 'C#4', 'G4', 'Bb4', 'E5'])]
-    sgain = lambda t: float(np.interp(t, [CRE, LS, BS, CB], [-19.0, -13.0, -7.0, -1.0]))
+    sgain = lambda t: float(np.interp(t, [CRE, LS, BS, CB], [-21.0, -16.0, -11.0, -6.0]))
     for i, (ts, notes) in enumerate(prog):
         te = prog[i + 1][0] if i + 1 < len(prog) else CB
         att = 2.0 if i == 0 else 0.5
         chord(mx, notes, ts - (0 if i == 0 else 0.25), te + 0.3, att=att, rel=0.6, gain=sgain(ts), spread=0.8,
               label=f'two{i}', voices=4)
     # rising high violins on the bridge
-    strings(mx, 'E5', BS - 0.5, CB, att=2.0, rel=0.4, gain=-14.0, p=0.2, voices=5, spread=0.8, label='bridgeV',
+    strings(mx, 'E5', BS - 0.5, CB, att=2.0, rel=0.4, gain=-16.0, p=0.2, voices=5, spread=0.8, label='bridgeV',
             fcurve=lambda t: hz('E5') * 2 ** (5 / 12 * ease((t - BS) / (CB - BS))))
     s_bright += [(CRE - 1, 0.2), (CRE, 0.2), (LS, 0.4), (BS, 0.7), (CB, 1.0)]
     s_space += [(CRE - 1, 0.1), (CB, 0.15)]
@@ -772,8 +772,8 @@ def build(tl):
     pend = CO + 1.4
     TG = C['title_glow']
     sus = ['D3', 'A3', 'E4', 'A4', 'D5']
-    envE = [(ep0, -110), (SRt + 4, -9), (C['title_xin_heart_start'], -10), (TG, -11), (TG + 2.5, -5), (C['title_out'], -9),
-            (C['credits_in'], -12), (CO - 1.0, -16), (pend, -110)]
+    envE = [(ep0, -110), (SRt + 4, -9), (C['title_xin_heart_start'], -10), (TG, -11), (TG + 2.5, -11), (C['title_out'], -12),
+            (C['credits_in'], -15), (CO - 1.0, -19), (pend, -110)]
     for i, nt in enumerate(sus):
         strings(mx, nt, ep0, pend, env=envE, gain=-17.0, p=(i / 4 * 2 - 1) * 0.6, voices=3, label='sus')
     s_bright += [(ep0 - 0.1, 0.2), (TG, 0.25), (TG + 2, 0.35), (pend, 0.2)]
@@ -819,9 +819,9 @@ def build(tl):
         mx.add('music', t, y, -33.0, p, {'space': 0.5})
         mx.add('sfx', t, X.whoosh(0.6, f'grass{k}', peak=0.6, f_lo=1500, f_hi=5000, width_oct=0.8,
                                   pan_from=p, pan_to=p), -40.0, sends={'space': 0.3})
-    mx.add('music', TG, I.bell('D3', 14.0, 'title'), -7.0, 0.0, {'hall': 0.2, 'space': 0.8})
-    pno(mx, TG, 'D1', 0.7, ring=11.0, gain=-8.0, sends={'hall': 0.3, 'space': 0.5})
-    pno(mx, TG, 'D2', 0.6, ring=11.0, gain=-10.0, sends={'hall': 0.3, 'space': 0.5})
+    mx.add('music', TG, I.bell('D3', 14.0, 'title'), -14.0, 0.0, {'hall': 0.2, 'space': 0.8})
+    pno(mx, TG, 'D1', 0.7, ring=11.0, gain=-12.0, sends={'hall': 0.3, 'space': 0.5})
+    pno(mx, TG, 'D2', 0.6, ring=11.0, gain=-14.0, sends={'hall': 0.3, 'space': 0.5})
     n = ns(6.0)
     gs = sum(I.glass(nt, n, 'latin' + nt, beat=0.3) for nt in ('D6', 'A6', 'E7'))
     gs *= Adb(n, 0, [(0, -110), (0.7, -39), (2.0, -43), (6.0, -110)])
@@ -869,7 +869,7 @@ def build(tl):
         a, b = sp_
         raw = mx.choir[:, a:b].astype(float)
         y = np.stack([decorrelate(I.choir_process(raw[0]), 'choirL'), decorrelate(I.choir_process(raw[1]), 'choirR')])
-        mx.add_bus('music', (y * db(-6.0)).astype(np.float32), a, {'hall': 0.5, 'space': 0.15})
+        mx.add_bus('music', (y * db(-21.0)).astype(np.float32), a, {'hall': 0.5, 'space': 0.15})
     return mx, windows, groups
 
 
@@ -915,6 +915,7 @@ def main():
     N = mix.shape[1]
     # master bus: subsonic/DC high-pass, mono below 110 Hz
     mix = hp(mix, 18.0, 4)
+    mix = lp(mix, 19500.0, 8)
     mid = 0.5 * (mix[0] + mix[1])
     side = hp(0.5 * (mix[0] - mix[1]), 110.0, 2)
     mix = np.stack([mid + side, mid - side])
@@ -926,7 +927,7 @@ def main():
     gain = 10 ** ((target - l0) / 20)
     for it in range(4):
         z = mix * gain
-        G = M.limiter_gain(z, ceiling_db=-1.3)
+        G = M.limiter_gain(z, ceiling_db=-1.3, release=0.35)
         out = z * G
         li = M.integrated_lufs(out)
         log(f'  iter {it}: gain {20 * np.log10(gain):+.2f} dB -> {li:.2f} LUFS, '
@@ -935,6 +936,12 @@ def main():
             break
         gain *= 10 ** ((target - li) / 20)
     out *= gate
+    grdb = -20 * np.log10(G)
+    h = ns(0.25)
+    nb = len(grdb) // h
+    gb = grdb[:nb * h].reshape(nb, h).max(axis=1)
+    gr_report = [f'{i * 0.25:7.2f}s {v:4.1f} dB' for i, v in enumerate(gb) if v > 1.0]
+    log('limiter GR > 1 dB at:', ', '.join(gr_report[:40]))
     tp = M.true_peak_dbtp(out)
     li = M.integrated_lufs(out)
     log(f'final: {li:.2f} LUFS integrated, true peak {tp:.2f} dBTP')
@@ -972,6 +979,7 @@ def main():
                          'epilogue': (209.5, 248)}.items():
         m = (tS >= a) & (tS < b)
         report.append(f'short-term LUFS {name:9s}: max {lS[m].max():6.1f}, median {np.median(lS[m]):6.1f}')
+    report.append('limiter gain reduction > 1 dB (250 ms bins): ' + (', '.join(gr_report) or 'none'))
     report.append(f'render time: {time.time() - T0:.1f} s')
     txt = '\n'.join(report)
     print(txt)

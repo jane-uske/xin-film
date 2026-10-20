@@ -29,7 +29,7 @@ export function candleState(util, cue, T) {
 export function dripList(cue) {
   const P = Math.PI / 2;
   return [
-    { th: P + 0.36, t: cue('wax_drip'), run: 7.0, len: 3.1, w: 1.0 },
+    { th: Math.PI - 0.42, t: cue('wax_drip'), run: 7.5, len: 2.7, w: 1.0 },
     { th: P - 0.95, t: cue('copy_cascade_start') + 1.5, run: 6, len: 6.4, w: 0.9 },
     { th: P + 1.25, t: cue('copy_cascade_end') + 1.2, run: 5, len: 4.4, w: 1.1 },
     { th: P - 0.32, t: cue('power_off') - 1.5, run: 4, len: 9.5, w: 1.2 },
@@ -44,32 +44,40 @@ export function dripList(cue) {
 const waxCommon = /* glsl */ `
 uniform vec3 uFlamePos; uniform float uFlameI; uniform vec3 uFlameCol;
 uniform vec3 uDigPos; uniform float uDigI; uniform vec3 uDigCol;
-uniform vec3 uMatchPos; uniform float uMatchI;
+uniform vec3 uMatchPos; uniform float uMatchI; uniform float uLatFill;
 uniform float uH, uR, uRp, uPoolY, uAmb;
 uniform vec4 uAsh[6];
 in vec3 vW; in vec3 vN; in float vZone; in float vWet;
 out vec4 o;
 vec3 waxLight(vec3 P, vec3 N, vec3 V){
-  // 1) 次表面：火光从熔池进入，沿蜡体向下扩散；壁越薄（熔池越大）越透
-  float depthTop = max(uPoolY + 0.25 - P.y, 0.0);
-  float rad = length(P.xz);
+  float drip = step(3.5, vZone);
+  float zn = drip > 0.5 ? 0.0 : vZone;
+  // 1) 次表面：火光从熔池进入，沿蜡体向下扩散、衰减并变红；壁越薄（熔池越大）越透
+  float depthTop = max(uH - P.y, 0.0);
   float wall = max(uR - uRp, 0.12);
-  vec3 absorb = vec3(0.16, 0.46, 1.25);
-  vec3 trans = exp(-depthTop * absorb) * exp(-wall * vec3(0.35, 0.6, 1.0));
   float dF = length(uFlamePos - P);
-  float sss = uFlameI * 1.9 / (1.0 + 0.18 * dF * dF);
-  // 侧面：越靠近杯沿越亮；视线越掠射，穿过的薄壁越多
-  float side = 1.0 - smoothstep(0.5, 0.9, vZone);
+  float sss = uFlameI / (1.0 + 0.06 * dF * dF);
+  float side = 1.0 - smoothstep(0.25, 0.9, zn);
   float rim = pow(1.0 - abs(dot(N, V)), 2.0);
-  vec3 col = trans * sss * (0.55 + 0.6 * rim * side) * vec3(1.0, 0.62, 0.30);
+  // 杯沿最薄：透光最强；向下指数衰减，颜色由黄白变为橙红
+  vec3 trans = exp(-depthTop * vec3(0.95, 1.55, 2.6));
+  float thin = 0.45 + 0.55 * exp(-wall * 0.8);
+  vec3 col = trans * sss * thin * (0.75 + 0.6 * rim) * vec3(1.0, 0.56, 0.26) * 0.66;
+  // 杯沿唇口：一圈亮边
+  float lip = smoothstep(0.2, 0.55, zn) * (1.0 - smoothstep(0.9, 1.1, zn));
+  col += vec3(1.0, 0.72, 0.42) * sss * lip * 0.32;
+  // 蜡泪是一道凸起的棱：棱脊更透更亮，两侧边缘更暗
+  col *= mix(1.0, mix(0.45, 1.35, pow(max(dot(N, V), 0.0), 1.3)), drip);
+  // 蜡本身是白的：一层很淡的漫散射，让形体在暗处仍可读
+  col += vec3(1.0, 0.82, 0.66) * uFlameI * 0.018 * exp(-depthTop * 0.25) / (1.0 + 0.02 * dF * dF);
   // 2) 直接光（顶部肩面、熔池、蜡泪顶面）
   vec3 L = normalize(uFlamePos - P);
   float ndl = max(dot(N, L), 0.0);
   float wrap = max((dot(N, L) + 0.35) / 1.35, 0.0);
-  col += uFlameCol * uFlameI * mix(wrap * 0.4, ndl, 0.6) * 1.6 / (1.0 + dF * dF);
+  col += uFlameCol * uFlameI * mix(wrap * 0.4, ndl, 0.6) * 0.75 / (1.0 + dF * dF);
   // 3) 镜面：液态熔池与新鲜蜡泪是湿的
   vec3 Hh = normalize(L + V);
-  float gloss = mix(0.15, 1.0, max(step(1.5, vZone), vWet));
+  float gloss = mix(0.15, 1.0, max(step(1.5, zn), vWet));
   float sp = pow(max(dot(N, Hh), 0.0), mix(18.0, 220.0, gloss)) * mix(0.12, 2.6, gloss);
   col += uFlameCol * uFlameI * sp * 3.0 / (1.0 + dF * dF);
   // 4) 数据之火的冷光（只照到朝向它的一面）
@@ -78,11 +86,13 @@ vec3 waxLight(vec3 P, vec3 N, vec3 V){
   vec3 Hd = normalize(Ld + V);
   col += uDigCol * uDigI * (ndd * 0.9 + pow(max(dot(N, Hd), 0.0), 40.0) * 0.6) / (1.0 + dd * dd * 0.6);
   // 冷光也透进蜡里一点
-  col += uDigCol * uDigI * 0.25 * exp(-max(uR - dot(normalize(P.xz + 1e-4), normalize(uDigPos.xz - P.xz + 1e-4)) * 0.0, 0.0)) * pow(max(dot(N, Ld), 0.0), 0.5) / (1.0 + dd * dd);
+  col += uDigCol * uDigI * 0.12 * pow(max(dot(N, Ld), 0.0), 0.5) / (1.0 + dd * dd);
   // 5) 划火柴的瞬间光
   vec3 Lm = uMatchPos - P; float dm = length(Lm); Lm /= dm;
   col += vec3(1.0, 0.55, 0.22) * uMatchI * (max(dot(N, Lm), 0.0) * 0.8 + 0.15) / (1.0 + dm * dm * 0.4);
   col += vec3(0.6, 0.5, 0.42) * uAmb;
+  // 画外火海的冷光（从右后方）
+  col += vec3(0.2, 0.62, 1.0) * uLatFill * (pow(max(dot(N, normalize(vec3(1.0, 0.25, -0.6))), 0.0), 1.5) * 0.5 + 0.02);
   return col;
 }
 `;
@@ -98,17 +108,43 @@ void main(){
 
 const waxFS = /* glsl */ `
 precision highp float;
+uniform vec4 uF0, uF1; uniform vec2 uRight; uniform vec3 uOrigin; uniform float uTmW, uFGain;
 ${waxCommon}
+${'' /* 烛火函数 */}
+__FLAME__
 void main(){
   vec3 N = normalize(vN);
   vec3 V = normalize(cameraPosition - vW);
   if (!gl_FrontFacing) N = -N;
-  vec3 col = waxLight(vW, N, V);
+  // 蜡面的细微起伏与斑驳（液态熔池除外）
+  float solid = 1.0 - step(1.5, vZone) * (1.0 - step(3.5, vZone));
+  vec3 q = vW * vec3(2.3, 1.1, 2.3);
+  N = normalize(N + solid * 0.07 * vec3(snoise(q * 1.7), snoise(q * 1.7 + 7.1), snoise(q * 1.7 + 13.3)));
+  float mott = snoise(vW * vec3(1.3, 0.45, 1.3)) * 0.6 + snoise(vW * 6.0) * 0.25 + snoise(vW * 19.0) * 0.15;
+  vec3 col = waxLight(vW, N, V) * (1.0 + solid * 0.16 * mott);
   // 熔池：液态的蜡，更透、更亮
-  if (vZone > 1.5) {
-    float rr = length(vW.xz);
-    col *= 1.35;
-    col += uFlameCol * uFlameI * 0.5 * smoothstep(uRp, 0.0, rr) * vec3(1.0, 0.8, 0.55);
+  float dF = length(uFlamePos - vW);
+  if (vZone > 1.5 && vZone < 2.5) {
+    // 液态熔池：像一面暗的镜子，映出火焰
+    vec3 I = normalize(vW - cameraPosition);
+    vec3 R = reflect(I, vec3(0.0, 1.0, 0.0));
+    vec3 pn = vec3(uRight.y, 0.0, -uRight.x);  // 公告板平面的法线（朝向摄影机方向的水平分量）
+    float den = dot(R, pn);
+    if (abs(den) > 1e-3) {
+      float tt = dot(uOrigin - vW, pn) / den;
+      if (tt > 0.0) {
+        vec3 h = vW + R * tt - uOrigin;
+        vec2 bp = vec2(dot(h.xz, uRight), h.y);
+        float fres = 0.04 + 0.5 * pow(1.0 - abs(I.y), 5.0);
+        col *= 0.55;
+        col += candleFlame(bp, uF0, uF1, uRight, uFGain, 0.0, uTmW).rgb * (fres + 0.22);
+      }
+    }
+  }
+  if (vZone > 0.7 && vZone < 2.5) {
+    // 顶部：光直接从熔池里透出来（最亮），肩部次之
+    float pool = step(1.5, vZone);
+    col += vec3(1.0, 0.62, 0.30) * uFlameI * (0.22 + 0.3 * pool) / (1.0 + 0.22 * dF * dF);
   }
   // 灰烬：种子的灰落在蜡上
   for (int i = 0; i < 6; i++) {
@@ -122,7 +158,7 @@ void main(){
 }`;
 
 // ---------- 烛火：面向摄影机的公告板，按 flameModel 的同一个场着色 ----------
-const flameVS = /* glsl */ `
+export const flameVS = /* glsl */ `
 uniform vec3 uOrigin; uniform vec2 uRight;
 out vec2 vP;
 void main(){
@@ -143,35 +179,16 @@ vec4 candleFlame(vec2 p, vec4 f0, vec4 f1, vec2 right, float gain, float wick, f
   float cu = dot(c2, right);
   float w = flHalfW(s, f0);
   float rn = abs(p.x - cu) / w;
-  float thick = sqrt(max(1.0 - rn * rn, 0.0));
-  float vin = step(0.0, s) * step(s, 1.0);
-  // 发光区：芯部上方开始，焰尖处变薄
-  float lumV = smoothstep(0.10, 0.34, s) * (1.0 - smoothstep(0.72, 1.0, s));
-  float edge = smoothstep(1.0, 0.62, rn);
-  float lum = lumV * edge * (0.25 + 0.75 * thick);
-  // 暗区：芯周围未燃尽的蒸气
-  float dark = smoothstep(0.34, 0.10, s) * smoothstep(0.75, 0.15, rn);
-  // 热度：中心下部最热
-  float heat = clamp(lum * (1.15 - 0.95 * pow(rn, 1.6)) * (1.12 - 0.62 * s), 0.0, 1.0);
-  vec3 cDeep = vec3(1.0, 0.20, 0.03);
-  vec3 cOr = vec3(1.0, 0.42, 0.10);
-  vec3 cYel = vec3(1.0, 0.70, 0.30);
-  vec3 cCore = vec3(1.0, 0.93, 0.78);
-  vec3 col = mix(cDeep, cOr, smoothstep(0.0, 0.25, heat));
-  col = mix(col, cYel, smoothstep(0.2, 0.55, heat));
-  col = mix(col, cCore, smoothstep(0.55, 0.9, heat));
-  float I = lum * (1.4 + 13.0 * heat * heat) * (1.0 - 0.75 * dark) * vin;
-  // 外焰：一层更宽、更暗的橙色罩
-  float mant = smoothstep(1.28, 0.9, rn) * smoothstep(0.05, 0.3, s) * (1.0 - smoothstep(0.85, 1.12, s)) * vin;
-  vec3 e = col * I + cOr * mant * 0.35;
+  float heat;
+  float I = flLum(rn, s, heat);
+  vec3 col = warmPalette(heat);
+  vec3 cDeep = vec3(1.0, 0.16, 0.02), cOr = vec3(1.0, 0.36, 0.07);
+  vec3 e = col * I + cOr * flMantle(rn, s);
   // 焰尖：拉长的暗红尾巴
   float tipS = flS(p.y, f0);
   float tip = smoothstep(0.82, 0.97, tipS) * (1.0 - smoothstep(1.0, 1.12, tipS)) * smoothstep(0.9, 0.2, abs(p.x - cu) / max(w, 0.05));
-  e += cDeep * tip * 0.45;
-  // 蓝色杯状底
-  float blue = smoothstep(0.42, 0.06, s) * smoothstep(0.42, 0.9, rn) * smoothstep(1.25, 0.92, rn) * step(-0.02, s);
-  blue += smoothstep(0.30, 0.0, s) * smoothstep(0.8, 0.0, rn) * 0.25 * step(-0.02, s);
-  e += vec3(0.10, 0.26, 1.0) * blue * 1.6;
+  e += cDeep * tip * 0.18;
+  e += vec3(0.12, 0.28, 1.0) * flBlue(rn, s) * 0.95;
   // 芯：一根细的、略弯的黑线，顶端一粒红
   float a = 0.0;
   if (wick > 0.0) {
@@ -187,6 +204,7 @@ vec4 candleFlame(vec2 p, vec4 f0, vec4 f1, vec2 right, float gain, float wick, f
 }
 `;
 
+const _flameFS = 0;
 const flameFS = /* glsl */ `
 precision highp float;
 uniform vec4 uF0, uF1; uniform vec2 uRight; uniform float uGain, uWick, uTm;
@@ -198,14 +216,14 @@ void main(){
 }`;
 
 // 光晕：大气与镜头里的散射，不做深度测试
-const haloFS = /* glsl */ `
+export const haloFS = /* glsl */ `
 precision highp float;
 uniform float uGain; uniform vec3 uCol; uniform vec2 uC;
 in vec2 vP; out vec4 o;
 void main(){
   vec2 d = (vP - uC) * vec2(1.0, 0.78);
   float r = length(d);
-  float h = 0.20 / (1.0 + r * r * 1.4) + 0.03 * exp(-r * 0.35);
+  float h = 0.045 / (1.0 + r * r * 2.2) + 0.007 * exp(-r * 0.3);
   o = vec4(uCol * h * uGain, 0.0);
 }`;
 
@@ -252,14 +270,19 @@ export function makeCandle(ctx, shared) {
   geo.setAttribute('wet', new THREE.BufferAttribute(wet, 1));
   geo.setIndex(idx);
 
+  const flameU = {
+    uOrigin: { value: new THREE.Vector3() }, uRight: { value: new THREE.Vector2(1, 0) },
+    uF0: { value: new THREE.Vector4() }, uF1: { value: new THREE.Vector4() }, uGain: { value: 1 }, uWick: { value: 1 }, uTm: { value: 0 },
+  };
   const waxU = {
+    uF0: flameU.uF0, uF1: flameU.uF1, uRight: flameU.uRight, uOrigin: flameU.uOrigin, uTmW: flameU.uTm, uFGain: flameU.uGain,
     uFlamePos: shared.uFlamePos, uFlameI: shared.uFlameI, uFlameCol: shared.uFlameCol,
     uDigPos: shared.uDigPos, uDigI: shared.uDigI, uDigCol: shared.uDigCol,
-    uMatchPos: shared.uMatchPos, uMatchI: shared.uMatchI,
+    uMatchPos: shared.uMatchPos, uMatchI: shared.uMatchI, uLatFill: shared.uLatFill,
     uH: { value: 11 }, uR: { value: CANDLE.R }, uRp: { value: 1 }, uPoolY: { value: 10.8 }, uAmb: { value: 0 },
     uAsh: { value: Array.from({ length: 6 }, () => new THREE.Vector4(0, 0, 0.1, 0)) },
   };
-  const waxMat = new THREE.ShaderMaterial({ glslVersion: THREE.GLSL3, vertexShader: waxVS, fragmentShader: waxFS, uniforms: waxU, side: THREE.DoubleSide });
+  const waxMat = new THREE.ShaderMaterial({ glslVersion: THREE.GLSL3, vertexShader: waxVS, fragmentShader: waxFS.replace('__FLAME__', ctx.glsl.simplex3 + candleFlameGLSL), uniforms: waxU, side: THREE.DoubleSide });
   const body = new THREE.Mesh(geo, waxMat);
   body.frustumCulled = false;
   group.add(body);
@@ -270,7 +293,7 @@ export function makeCandle(ctx, shared) {
     const n = DL * DC;
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(n * 3), 3));
-    g.setAttribute('zone', new THREE.BufferAttribute(new Float32Array(n).fill(0.6), 1));
+    g.setAttribute('zone', new THREE.BufferAttribute(new Float32Array(n).fill(4.0), 1));
     g.setAttribute('wet', new THREE.BufferAttribute(new Float32Array(n), 1));
     const ii = [];
     for (let j = 0; j < DL - 1; j++) for (let i = 0; i < DC - 1; i++) {
@@ -308,10 +331,6 @@ export function makeCandle(ctx, shared) {
     g.setIndex([0, 1, 2, 0, 2, 3]);
     return g;
   };
-  const flameU = {
-    uOrigin: { value: new THREE.Vector3() }, uRight: { value: new THREE.Vector2(1, 0) },
-    uF0: { value: new THREE.Vector4() }, uF1: { value: new THREE.Vector4() }, uGain: { value: 1 }, uWick: { value: 1 }, uTm: { value: 0 },
-  };
   const blendPM = { transparent: true, depthWrite: false, blending: THREE.CustomBlending, blendSrc: THREE.OneFactor, blendDst: THREE.OneMinusSrcAlphaFactor, blendEquation: THREE.AddEquation };
   const flame = new THREE.Mesh(quad(-1.7, 1.7, -0.75, 5.6), new THREE.ShaderMaterial({ glslVersion: THREE.GLSL3, vertexShader: flameVS, fragmentShader: flameFS, uniforms: flameU, ...blendPM }));
   flame.frustumCulled = false; flame.renderOrder = 10;
@@ -325,7 +344,7 @@ export function makeCandle(ctx, shared) {
 
   const rimNoise = (th, H) => {
     const { noise1 } = ctx.util;
-    return 0.09 * noise1(th * 2.1 + 3.0) + 0.05 * noise1(th * 5.3 + H * 0.7) + 0.025 * noise1(th * 11.0 + 7.0);
+    return 0.05 * noise1(th * 2.1 + 3.0) + 0.028 * noise1(th * 5.3 + H * 0.7) + 0.01 * noise1(th * 11.0 + 7.0);
   };
   const drL = dripList(ctx.cue);
 
@@ -365,7 +384,7 @@ export function makeCandle(ctx, shared) {
       for (const d of drL) {
         if (T < d.t) continue;
         let da = Math.atan2(Math.sin(th - d.th), Math.cos(th - d.th));
-        notch += 0.22 * Math.exp(-(da * da) / 0.012) * ctx.util.smoothstep(d.t, d.t + 1.2, T);
+        notch += 0.07 * Math.exp(-(da * da) / 0.02) * ctx.util.smoothstep(d.t, d.t + 1.2, T);
       }
       for (let j = 0; j < PROF; j++) {
         const [r, y, z, rw] = prof[j];
@@ -401,10 +420,10 @@ export function makeCandle(ctx, shared) {
         const yc = Math.min(y, yTop);
         // 宽度：顶部薄膜，末端水滴
         const bulb = Math.exp(-Math.pow((1 - v) * len / 0.22, 2));
-        let w = (0.09 + 0.05 * v + 0.11 * bulb) * d.w * (0.4 + 0.6 * form);
+        let w = (0.075 + 0.045 * v + 0.12 * bulb) * d.w * (0.4 + 0.6 * form);
         if (v > 0.985) w *= (1 - v) / 0.015;
         if (yc < 0.05) w *= 1.6;
-        const h = w * (0.55 + 0.5 * bulb);
+        const h = w * (0.8 + 0.6 * bulb);
         const th = d.th + 0.018 * Math.sin(y * 1.4 + k) + 0.01 * Math.sin(y * 3.7 + k * 2);
         const nx = Math.cos(th), nz = Math.sin(th), tx = -nz, tz = nx;
         const yy = Math.max(yc, 0.02);

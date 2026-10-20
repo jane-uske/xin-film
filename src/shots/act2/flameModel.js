@@ -60,7 +60,38 @@ vec3 flame3(vec3 p, vec4 f0, vec4 f1){
   float rn = length(p.xz - c) / w;
   return vec3(rn, s, step(0.0, s) * step(s, 1.0));
 }
-// 共同的"密度"：发光体的强度场（两团火都用它）
+// 共同的发光模型：投影到画面上的亮度（rn 为横向归一化距离）。烛火直接用它着色；
+// 数据之火的每一列光点按弦长分摊同一个值 —— 一列点叠起来，正好是同一幅火焰。
+float flLum(float rn, float s, out float heat){
+  float vin = step(0.0, s) * step(s, 1.0);
+  float thick = sqrt(max(1.0 - rn * rn, 0.0));
+  float lumV = smoothstep(0.10, 0.34, s) * (1.0 - smoothstep(0.72, 1.0, s));
+  float edge = smoothstep(1.0, 0.62, rn);
+  float lum = lumV * edge * (0.25 + 0.75 * thick);
+  float dark = smoothstep(0.34, 0.10, s) * smoothstep(0.75, 0.15, rn);
+  heat = clamp(lumV * edge * (1.0 - 0.8 * rn * rn) * (1.08 - 0.62 * s), 0.0, 1.0);
+  return lum * (0.65 + 3.9 * pow(heat, 2.2)) * (1.0 - 0.8 * dark) * vin;
+}
+float flMantle(float rn, float s){
+  float m = smoothstep(1.7, 0.7, rn) * smoothstep(0.05, 0.3, s) * (1.0 - smoothstep(0.8, 1.15, s)) * step(0.0, s) * step(s, 1.0);
+  return m * m * 0.16;
+}
+float flBlue(float rn, float s){
+  float b = smoothstep(0.27, 0.03, s) * smoothstep(0.45, 0.9, rn) * smoothstep(1.2, 0.95, rn) * step(-0.02, s);
+  return b + smoothstep(0.2, 0.0, s) * smoothstep(0.8, 0.0, rn) * 0.2 * step(-0.02, s);
+}
+vec3 digPalette(float heat){
+  // 与暖色调同样的亮度阶梯：深蓝（≈深红）→ #39C6FF（≈橙）→ #7FE8FF（≈黄）→ 白（≈芯）
+  vec3 col = mix(vec3(0.015, 0.10, 0.55), vec3(0.04, 0.56, 1.0), smoothstep(0.0, 0.25, heat));
+  col = mix(col, vec3(0.21, 0.81, 1.0), smoothstep(0.2, 0.55, heat));
+  return mix(col, vec3(0.86, 0.97, 1.0), smoothstep(0.62, 0.95, heat));
+}
+vec3 warmPalette(float heat){
+  vec3 col = mix(vec3(1.0, 0.16, 0.02), vec3(1.0, 0.36, 0.07), smoothstep(0.0, 0.25, heat));
+  col = mix(col, vec3(1.0, 0.60, 0.20), smoothstep(0.2, 0.55, heat));
+  return mix(col, vec3(1.0, 0.86, 0.62), smoothstep(0.62, 0.95, heat));
+}
+// 体密度（用于判断一个点是否在火焰体内）
 float flDensity(float rn, float s){
   float body = smoothstep(1.0, 0.45, rn);
   float vert = smoothstep(0.02, 0.22, s) * (1.0 - smoothstep(0.78, 1.0, s));

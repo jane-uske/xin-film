@@ -10,59 +10,65 @@ export function buildCosmos(ctx, scene) {
   const noise = makeNoise3(util.rng(77));
 
   // ---------------------------------------------------------------- cloud / disk particles
-  const N = 210000;
+  const N = 165000;
   const aCyl = new Float32Array(N * 3), aDisk = new Float32Array(N * 3), aRnd = new Float32Array(N * 4);
   // Filaments: streamlines traced through a smooth noise vector field (like Herschel cloud maps),
   // with particles scattered around them; plus a thin diffuse component.
   let n = 0;
   const field = (x, y, z) => {
     const fx = noise.fbm(x * 0.035, y * 0.035, z * 0.035, 2), fy = noise.fbm(x * 0.035 + 5.2, y * 0.035 + 1.3, z * 0.035 + 7.7, 2) * 0.35, fz = noise.fbm(x * 0.035 + 9.1, y * 0.035 + 4.4, z * 0.035 + 2.8, 2);
-    const l = Math.hypot(fx, fy, fz) || 1; return [fx / l, fy / l, fz / l];
+    // add a swirl around the cloud axis so streamlines never stall in sinks (which made bright knots)
+    const r = Math.hypot(x, z) + 6, tx = -z / r, tz = x / r;
+    const gx = fx + tx * 0.35, gy = fy, gz = fz + tz * 0.35;
+    const l = Math.hypot(gx, gy, gz) || 1; return [gx / l, gy / l, gz / l];
   };
-  const push = (x, y, z, dusty) => {
+  const push = (x, y, z, bright) => {
     const Rc = Math.hypot(x, z), phi = Math.atan2(z, x);
     let Rd = 1.4 + 21 * Math.pow(Math.min(Rc, 36) / 36, 1.15) * (0.82 + 0.36 * rng());
-    if (rng() < 0.05) Rd = 0.9 + 4 * Math.pow(rng(), 1.3); // dense inner disk
+    if (rng() < 0.03) Rd = 0.9 + 4 * Math.pow(rng(), 1.3); // dense inner disk
     Rd = Math.min(Rd, 27);
     const yd = rng.gauss() * (0.03 + 0.03 * Rd) * 0.7;
-    const om = 0.12 * Math.pow(Math.max(Rd, 1.8) / 10, -1.5);
+    const om = 0.19 * Math.pow(Math.max(Rd, 1.8) / 10, -1.5);
     aCyl.set([Rc, phi, y], n * 3);
     aDisk.set([Rd, yd, om], n * 3);
-    aRnd.set([rng(), rng(), rng(), dusty ? 1 : 0], n * 4);
+    // dustiness is a smooth field so colour regions are coherent, not confetti
+    const dz = util.smoothstep(-0.12, 0.22, noise.fbm(x * 0.04 + 21, y * 0.05, z * 0.04 - 8, 2));
+    aRnd.set([rng(), rng(), bright * (0.6 + 0.4 * rng()), dz], n * 4);
     n++;
   };
-  const NF = 520;
+  const NF = 170;
   for (let fi = 0; fi < NF && n < N; fi++) {
     let x, y, z;
     do { x = rng() * 2 - 1; y = rng() * 2 - 1; z = rng() * 2 - 1; } while (x * x + y * y + z * z > 1);
-    x *= 32; y *= 13; z *= 32;
-    const steps = 30 + Math.floor(rng() * 40);
+    const rb = Math.pow(rng(), 0.6); x *= 32 * rb; y *= 12 * rb; z *= 32 * rb;
+    const steps = 60 + Math.floor(rng() * 60);
     const pts = [];
     const dir = rng() < 0.5 ? 1 : -1;
     for (let k = 0; k < steps; k++) {
       pts.push([x, y, z]);
       const v = field(x, y, z);
-      x += v[0] * 0.9 * dir; y += v[1] * 0.9 * dir; z += v[2] * 0.9 * dir;
+      x += v[0] * 0.8 * dir; y += v[1] * 0.8 * dir; z += v[2] * 0.8 * dir;
     }
-    const per = Math.floor(((N * 0.86) / NF) * (0.4 + 1.2 * rng()));
-    const w0 = 0.25 + 1.1 * rng() * rng();
+    const per = Math.floor(((N * 0.74) / NF) * (0.4 + 1.2 * rng()));
+    const w0 = 0.12 + 0.7 * rng() * rng();
+    const fb = 0.35 + 0.65 * rng();
     const dusty = rng() < 0.35;
     for (let k = 0; k < per && n < N; k++) {
       const a = rng() * (pts.length - 1), i0 = Math.floor(a), fr = a - i0;
       const P0 = pts[i0], P1 = pts[i0 + 1];
-      const wv = w0 * (0.5 + Math.sin((a / pts.length) * Math.PI)) ;
+      const wv = w0 * (0.4 + 1.2 * Math.pow(Math.sin((a / pts.length) * Math.PI), 2)) * (1 + 2.5 * Math.pow(rng(), 6));
       const px = P0[0] + (P1[0] - P0[0]) * fr + rng.gauss() * wv;
       const py = P0[1] + (P1[1] - P0[1]) * fr + rng.gauss() * wv * 0.7;
       const pz = P0[2] + (P1[2] - P0[2]) * fr + rng.gauss() * wv;
       const e = (px / 36) ** 2 + (py / 16) ** 2 + (pz / 36) ** 2;
       if (e > 1) continue;
-      push(px, py, pz, dusty ? rng() < 0.7 : rng() < 0.15);
+      push(px, py, pz, fb);
     }
   }
   while (n < N) {
     const u = rng() * 2 - 1, v = rng() * 2 - 1, w = rng() * 2 - 1;
     if (u * u + v * v + w * w > 1) continue;
-    push(u * 34, v * 14, w * 34, rng() < 0.25);
+    push(u * 34, v * 14, w * 34, 0.4);
   }
   const NC = n;
   const cloudGeo = new THREE.BufferGeometry();
@@ -74,11 +80,11 @@ export function buildCosmos(ctx, scene) {
 
   const cloudU = {
     uT: { value: 0 }, uCollapse: { value: 0 }, uG: { value: 0 }, uImp: { value: 0 }, uShock: { value: -1 },
-    uHeat: { value: 0 }, uFade: { value: 1 }, uS: { value: ctx.S }, uSize: { value: 1 }, uGain: { value: 1 }, uDebris: { value: 1 },
+    uHeat: { value: 0 }, uFade: { value: 1 }, uHotK: { value: 1 }, uS: { value: ctx.S }, uSize: { value: 1 }, uGain: { value: 1 }, uDebris: { value: 1 },
   };
 
   const CLOUD_FN = /* glsl */ `
-  uniform float uT, uCollapse, uG, uImp, uShock, uHeat, uFade, uSize, uGain, uDebris;
+  uniform float uT, uCollapse, uG, uImp, uShock, uHeat, uFade, uSize, uGain, uDebris, uHotK;
   ${glsl.simplex3}
   ${glsl.blackbody}
   // returns world position; writes heat colour terms
@@ -91,10 +97,10 @@ export function buildCosmos(ctx, scene) {
     float y = mix(cyl.z, dsk.y, cY);
     float phi = cyl.y + dsk.z * uG;
     // implosion: inner disk falls all the way, outer disk is dragged part-way
-    float k = uImp * uImp * uImp;
-    float w = mix(1.0, 0.45, smoothstep(5.0, 24.0, dsk.x));
-    phi += uImp * uImp * 2.2 * pow(10.0 / max(dsk.x, 1.5), 0.5);
-    R *= 1.0 - 0.975 * k * w;
+    float k = pow(uImp, 1.7);
+    float w = mix(1.0, 0.62, smoothstep(5.0, 24.0, dsk.x));
+    phi += k * 3.0 * pow(10.0 / max(dsk.x, 1.5), 0.5);
+    R *= 1.0 - 0.985 * k * w;
     y *= 1.0 - 0.95 * k;
     // ignition shock: snowplough -> particles pile up just behind the expanding front
     float front = 0.0, shocked = 0.0;
@@ -106,29 +112,34 @@ export function buildCosmos(ctx, scene) {
         shocked = 1.0;
         front = exp(-pow((1.0 - f) * 9.0, 2.0)) * exp(-uShock * 0.9);
         R = Rp;
-        y = y * (1.0 + 2.5 * (1.0 - exp(-uShock))) + (rnd.z - 0.5) * (0.3 + uShock * 0.35) * (0.4 + f);
+        y = y * (1.0 + 0.8 * (1.0 - exp(-uShock))) + (rnd.z - 0.5) * (0.15 + uShock * 0.12) * (0.4 + f);
       }
     }
     vec3 p = vec3(cos(phi) * R, y, sin(phi) * R);
     // turbulent drift of the cold cloud, damped as the disk organises
     float turb = (1.0 - cR) * 2.4 + shocked * min(uShock, 4.0) * 0.5;
-    vec3 q = p * 0.06 + vec3(0.0, uT * 0.035, rnd.x * 0.4);
-    p += vec3(snoise(q), snoise(q + 31.4), snoise(q + 71.7)) * turb;
+    if (turb > 0.001){
+      // cheap divergence-free-ish swirl (three crossed sine waves) instead of 3D simplex
+      vec3 q = p * 0.11 + vec3(rnd.x * 2.0, uT * 0.07, rnd.z * 2.0);
+      p += vec3(sin(q.y * 1.7 + q.z * 0.9 + 1.3) + 0.5 * sin(q.z * 3.1 - uT * 0.11),
+                sin(q.z * 1.3 + q.x * 1.1 + 4.1) * 0.6,
+                sin(q.x * 1.5 + q.y * 0.8 + 2.2) + 0.5 * sin(q.x * 2.9 + uT * 0.09)) * turb * 0.7;
+    }
 
     // ---- colour: cold gas (teal) / dust (amber) + thermal emission of the heating disk
     float Rn = max(R, 0.7);
     vec3 gas = mix(vec3(0.010, 0.050, 0.075), vec3(0.030, 0.13, 0.17), rnd.z);
     vec3 dust = mix(vec3(0.28, 0.11, 0.035), vec3(0.55, 0.25, 0.07), rnd.x);
-    vec3 base = rnd.w > 0.5 ? dust * 0.55 : gas;
+    vec3 base = mix(gas, dust * 0.5, rnd.w) * (0.4 + 1.1 * rnd.z);
     base *= 0.7 + 0.6 * cR; // dust lanes brighten as the disk compresses
     float K = 800.0 + uHeat * 7800.0 * pow(1.3 / Rn, 0.8) + k * w * 5000.0;
-    float em = uHeat * uHeat * 1.6 * pow(1.6 / Rn, 1.35) + k * w * (1.0 + 3.0 * k);
+    float em = uHeat * uHeat * 0.07 * pow(2.0 / Rn, 1.5) * (1.0 - 0.85 * k) + k * w * 0.25 * pow(2.0 / Rn, 0.5);
     em *= (1.0 - shocked);
-    vec3 hot = blackbody(K) * em;
+    vec3 hot = blackbody(K) * em * uHotK;
     // shock-heated material: blue-white at the front, cooling to orange / dull red behind it
     float Ks = 2200.0 + 11000.0 * front;
-    vec3 sh = blackbody(Ks) * (front * 9.0 + shocked * 0.18 * exp(-uShock * 0.6));
-    col = (base + hot) * (1.0 - shocked) + (base * 0.7 * uDebris + sh) * shocked;
+    vec3 sh = blackbody(Ks) * (front * 9.0 + shocked * 0.18 * exp(-uShock * 0.6)) * uHotK;
+    col = (base + hot) * (1.0 - shocked) * (1.0 - 0.85 * k * w) + (base * 0.35 * uDebris + sh) * shocked;
     vis = 1.0;
     return p;
   }`;
@@ -145,11 +156,11 @@ export function buildCosmos(ctx, scene) {
         vec3 p = cloudPos(aCyl, aDisk, aRnd, col, vis);
         vec4 mv = modelViewMatrix * vec4(p, 1.0);
         float dist = -mv.z;
-        float px = uSize * (1.1 + 1.6 * aRnd.x * aRnd.x) * clamp(34.0 / dist, 0.5, 3.0);
+        float px = uSize * (1.1 + 1.6 * aRnd.x * aRnd.x) * clamp(34.0 / dist, 0.5, 1.6);
         gl_PointSize = pointSize(px);
         // particles close to the lens are pulled out of focus and faded instead of becoming blobs
-        float near = smoothstep(1.5, 9.0, dist);
-        vCol = col * vAlphaK * uFade * uGain * near * (aRnd.w > 0.5 ? 1.3 : 1.0);
+        float near = smoothstep(4.0, 16.0, dist);
+        vCol = col * vAlphaK * uFade * uGain * near * 1.25;
         gl_Position = projectionMatrix * mv;
       }`,
     fragmentShader: /* glsl */ `
@@ -164,11 +175,21 @@ export function buildCosmos(ctx, scene) {
 
   // haze: a random subset re-drawn with large soft sprites into a quarter-res target
   const hazeScene = new THREE.Scene();
-  const hazeU = Object.assign({}, cloudU, { uS: { value: ctx.S / 4 }, uSize: { value: 30 }, uGain: { value: 0.03 } });
+  const hazeU = Object.assign({}, cloudU, { uS: { value: ctx.S / 4 }, uSize: { value: 24 }, uGain: { value: 0.13 }, uHotK: { value: 0.12 } });
   const hazeMat = cloudMat.clone();
   hazeMat.uniforms = hazeU;
   hazeMat.depthTest = false;
-  const haze = new THREE.Points(cloudGeo, hazeMat);
+  const HS = 12;
+  const hazeGeo = new THREE.BufferGeometry();
+  {
+    const m = Math.floor(NC / HS);
+    const sub = (src, k) => { const o = new Float32Array(m * k); for (let i = 0; i < m; i++) for (let j = 0; j < k; j++) o[i * k + j] = src[i * HS * k + j]; return o; };
+    hazeGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(m * 3), 3));
+    hazeGeo.setAttribute('aCyl', new THREE.BufferAttribute(sub(aCyl, 3), 3));
+    hazeGeo.setAttribute('aDisk', new THREE.BufferAttribute(sub(aDisk, 3), 3));
+    hazeGeo.setAttribute('aRnd', new THREE.BufferAttribute(sub(aRnd, 4), 4));
+  }
+  const haze = new THREE.Points(hazeGeo, hazeMat);
   haze.frustumCulled = false;
   hazeScene.add(haze);
   const NH = Math.min(NC, 26000); // haze uses every k-th particle via its own index buffer
@@ -179,7 +200,7 @@ export function buildCosmos(ctx, scene) {
     { tH: { value: hazeRT.texture }, k: { value: 1 } }, { blending: THREE.AdditiveBlending, transparent: true });
 
   // ---------------------------------------------------------------- embers (from the epigraph)
-  const NE = 2600;
+  const NE = 420;
   const eA = new Float32Array(NE * 4), eCyl = new Float32Array(NE * 3), eDisk = new Float32Array(NE * 3), eRnd = new Float32Array(NE * 4);
   for (let i = 0; i < NE; i++) {
     const j = Math.floor(rng() * NC);
@@ -222,12 +243,12 @@ export function buildCosmos(ctx, scene) {
         vec3 p = mix(s, target, k);
         vec4 mv = modelViewMatrix * vec4(p, 1.0);
         float dist = -mv.z;
-        float px = (2.0 + 2.0 * aE.y) * mix(1.0, 0.6, k);
+        float px = (2.6 + 2.6 * aE.y) * mix(1.0, 0.6, k);
         gl_PointSize = pointSize(px);
         // amber -> ember red as it cools, flickering; fades into the cloud's own dust colour
         float fl = 0.65 + 0.35 * sin(uT * (5.0 + 7.0 * aE.w) + aE.x * 40.0);
         vec3 amber = mix(vec3(1.0, 0.42, 0.14), vec3(1.0, 0.16, 0.03), smoothstep(0.0, 0.9, k + aE.z * 0.3));
-        float I = mix(2.2, 0.35, k) * fl * (1.0 - smoothstep(0.85, 1.0, k));
+        float I = mix(3.5, 0.35, k) * fl * (1.0 - smoothstep(0.85, 1.0, k));
         vCol = amber * I * vAlphaK * uEm * smoothstep(2.0, 6.0, dist);
         gl_Position = projectionMatrix * mv;
       }`,
@@ -339,21 +360,23 @@ export function buildCosmos(ctx, scene) {
         float rot = t * 0.012;
         vec3 q = vec3(n.x * cos(rot) - n.z * sin(rot), n.y, n.x * sin(rot) + n.z * cos(rot));
         vec3 wp = q * 3.0;
-        vec3 warp = vec3(snoise(wp + t * 0.05), snoise(wp + 13.0 - t * 0.04), snoise(wp + 27.0));
-        vec2 w1 = worley(q * 26.0 + warp * 0.9, t * 0.55);
-        float cell = smoothstep(0.0, 0.42, w1.y - w1.x);
-        float sup = snoise(q * 5.0 + warp * 0.6 + t * 0.02) * 0.5 + snoise(q * 11.0 - t * 0.03) * 0.25;
-        float gran = mix(1.0, 0.62 + 0.48 * cell, uGran) * (1.0 + 0.12 * sup * uGran);
+        vec3 warp = vec3(snoise(wp + t * 0.05), snoise(wp + 13.0 - t * 0.04), 0.0);
+        vec2 w1 = worley(q * 15.0 + warp * 0.7, t * 0.45);
+        float fine = snoise(q * 70.0 + warp * 2.0 + t * 0.1);
+        float cell = (1.0 - smoothstep(0.0, 0.95, w1.x)) * 0.6 + smoothstep(0.0, 0.3, w1.y - w1.x) * 0.25 + (0.5 + 0.5 * fine) * 0.15;
+        float sup = snoise(q * 5.0 + warp * 0.6 + t * 0.02) * 0.6;
+        float gran = mix(1.0, 0.6 + 0.62 * cell, uGran) * (1.0 + 0.32 * sup * uGran);
         // faculae: bright magnetic network near the limb
         float fac = smoothstep(0.35, 0.8, snoise(q * 7.0 + 3.1)) * (1.0 - mu) * 0.6;
         // limb darkening (quadratic law) and limb reddening
         float om = 1.0 - mu;
         float limb = 1.0 - 0.62 * om - 0.22 * om * om;
-        float K = uTemp * (0.78 + 0.22 * pow(mu, 0.5)) * (0.94 + 0.07 * cell);
-        vec3 c = blackbody(K);
-        c /= max(c.r, max(c.g, c.b));
-        c = mix(c, vec3(0.75, 0.88, 1.0), uHot);
-        float I = uI * limb * gran * (1.0 + fac) * (1.0 + uHot * 3.0);
+        // photosphere colour ramp: cool red-orange lanes -> golden cells -> pale-yellow hot centre
+        float x = limb * gran * (1.0 + fac);
+        vec3 coolC = vec3(0.9, 0.2, 0.035), midC = vec3(1.0, 0.56, 0.17), hotC = vec3(1.0, 0.9, 0.7);
+        vec3 c = x < 0.72 ? mix(coolC, midC, smoothstep(0.2, 0.72, x)) : mix(midC, hotC, smoothstep(0.72, 1.12, x));
+        c = mix(c, vec3(0.78, 0.9, 1.0), uHot);
+        float I = uI * x * (1.0 + uHot * 0.8);
         gl_FragColor = vec4(c * I, 1.0);
       }`,
   });
@@ -375,8 +398,8 @@ export function buildCosmos(ctx, scene) {
         float a = atan(vP.y, vP.x);
         float x = max(r - 1.0, 0.0);
         vec2 ca = vec2(cos(a), sin(a));
-        float st = snoise(vec3(ca * 2.2, x * 0.35 - uT * 0.015)) * 0.6 + snoise(vec3(ca * 6.0, x * 0.8 + 3.0 - uT * 0.02)) * 0.4;
-        float streamer = 0.55 + 0.45 * st;
+        float st = snoise(vec3(ca * 1.6, x * 0.25 - uT * 0.012)) * 0.75 + snoise(vec3(ca * 3.2, x * 0.4 + 3.0 - uT * 0.02)) * 0.25;
+        float streamer = 0.7 + 0.3 * st;
         float chromo = exp(-x * 55.0) * 2.4;
         float inner = exp(-x * 7.5) * 1.1 * (0.7 + 0.3 * streamer);
         float outer = exp(-x * 1.6) * 0.22 * streamer * streamer;
@@ -412,19 +435,19 @@ export function buildCosmos(ctx, scene) {
         float ang = 3.14159 * s;
         // footpoints at the limb, loop rises outward along uUp
         vec3 base = normalize(mix(uF1, uF2, s)) * ${SUN_R.toFixed(2)};
-        float h = sin(ang);
+        float h = pow(sin(ang), 0.75);
         vec3 tang = normalize(uF2 - uF1);
         vec3 side = normalize(cross(tang, uUp));
         float tw = aP.y * 6.2831 + s * 9.0 + uT * 0.15;
-        float rad = (0.035 + 0.05 * h) * ${SUN_R.toFixed(2)} * (0.5 + 0.5 * abs(aP.z));
+        float rad = (0.03 + 0.05 * h) * ${SUN_R.toFixed(2)} * (0.3 + 0.7 * abs(aP.z));
         vec3 p = base + uUp * h * uH * ${SUN_R.toFixed(2)} + (side * cos(tw) + uUp * sin(tw) * 0.5) * rad;
         vec3 q = p * 0.9 + vec3(0.0, 0.0, uT * 0.08);
-        p += vec3(snoise(q), snoise(q + 7.0), snoise(q + 13.0)) * 0.09 * ${SUN_R.toFixed(2)} * h;
+        p += vec3(snoise(q), snoise(q + 7.0), snoise(q + 13.0)) * 0.035 * ${SUN_R.toFixed(2)} * h;
         vec4 mv = modelViewMatrix * vec4(p, 1.0);
         gl_PointSize = pointSize(1.6 + 1.2 * aP.w);
         float ends = smoothstep(0.0, 0.08, s) * smoothstep(1.0, 0.92, s);
-        vec3 c = mix(vec3(1.0, 0.25, 0.10), vec3(1.0, 0.62, 0.35), aP.w * aP.w);
-        vCol = c * (0.9 + 0.8 * aP.w) * uI * ends * vAlphaK;
+        vec3 c = mix(vec3(1.0, 0.16, 0.05), vec3(1.0, 0.45, 0.18), aP.w * aP.w);
+        vCol = c * (0.12 + 0.2 * aP.w) * uI * ends * vAlphaK;
         gl_Position = projectionMatrix * mv;
       }`,
     fragmentShader: /* glsl */ `
