@@ -3,11 +3,15 @@
 //   ?t=45.5             渲染单帧静帧
 //   （默认）            浏览器实时预览，带配乐，空格暂停，←/→ 跳 5 秒
 import { Engine } from './engine/engine.js';
-import { loadFonts } from './engine/overlay.js';
+import { loadFonts, TYPE } from './engine/overlay.js';
 import { LABEL_TEXT } from './shots/common/labels.js';
 
 const q = new URLSearchParams(location.search);
 const scale = parseFloat(q.get('scale') || '1');
+// 对比用：?typecard=1&typehud=1 恢复旧字号
+if (q.has('typecard')) TYPE.card = parseFloat(q.get('typecard'));
+if (q.has('typehud')) TYPE.hud = parseFloat(q.get('typehud'));
+if (q.has('zhweight')) TYPE.zhWeight = parseInt(q.get('zhweight'), 10);
 
 const timeline = await (await fetch('timeline.json')).json();
 // 出品方署名放在本地配置（不进仓库），缺省为 ASTRA

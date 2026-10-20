@@ -15,7 +15,7 @@ const times = args._.map((x) => { const s = tl.shots.find((sh) => sh.id === x); 
 const server = await startServer(port, async () => {});
 const W = Math.round(tl.width * scale), H = Math.round(tl.height * scale);
 const { browser, page } = await launch({ width: W, height: H });
-await openFilm(page, port, `render=1&scale=${scale}`);
+await openFilm(page, port, `render=1&scale=${scale}${args.query ? '&' + args.query : ''}`);
 for (const t of times) {
   const frame = Math.round(t * tl.fps);
   const t0 = Date.now();

@@ -8,6 +8,9 @@ export const FONTS = {
   mono: '"JetBrains Mono", "Noto Sans SC", sans-serif',
 };
 
+// 全局字号比例（为投屏放大）：card 管字幕卡与章节标，hud 管机器标注
+export const TYPE = { card: 1.2, hud: 1.45, zhWeight: 400 };
+
 export const COLORS = {
   paper: [237, 230, 218],
   hud: [214, 232, 255],
@@ -68,11 +71,12 @@ export function drawCard(g, card, T, W, H, S) {
   const cx = W / 2;
   if (card.layout === 'center' || card.layout === 'lower') {
     const lower = card.layout === 'lower';
-    const zhSize = (lower ? 34 : 44) * S, enSize = (lower ? 23 : 27) * S;
-    const zy = lower ? H - 132 * S : H / 2 - 4 * S;
-    const ey = zy + (lower ? 44 : 56) * S;
+    const k = TYPE.card;
+    const zhSize = (lower ? 34 : 44) * S * k, enSize = (lower ? 23 : 27) * S * k;
+    const zy = lower ? H - (126 + 22 * k) * S : H / 2 - 4 * S;
+    const ey = zy + (lower ? 44 : 56) * S * k;
     const zsp = `${(lower ? 0.32 : 0.36) * zhSize}px`;
-    glowText(g, card.zh, cx + spacingPx(zsp) / 2, zy + rise, { font: `300 ${zhSize}px ${FONTS.zh}`, color: COLORS.paper, alpha: env.a, glow: 0.28, glowBlur: 14, blur, spacing: zsp, S });
+    glowText(g, card.zh, cx + spacingPx(zsp) / 2, zy + rise, { font: `${TYPE.zhWeight} ${zhSize}px ${FONTS.zh}`, color: COLORS.paper, alpha: env.a, glow: 0.28, glowBlur: 14, blur, spacing: zsp, S });
     const esp = `${0.04 * enSize}px`;
     glowText(g, card.en, cx + spacingPx(esp) / 2, ey + rise * 1.3, { font: `italic 300 ${enSize}px ${FONTS.en}`, color: COLORS.paper, alpha: env.a * 0.78, glow: 0.2, glowBlur: 10, blur: blur * 1.2, spacing: esp, S });
   } else if (card.layout === 'chapter') {
@@ -84,8 +88,9 @@ export function drawCard(g, card, T, W, H, S) {
     const lw = 36 * S * env.k;
     g.beginPath(); g.moveTo(x, y - 7 * S); g.lineTo(x + lw, y - 7 * S); g.stroke();
     g.restore();
-    glowText(g, card.zh, x + 52 * S, y, { font: `300 ${22 * S}px ${FONTS.zh}`, color: COLORS.paper, alpha: a, glow: 0.25, blur: blur * 0.6, spacing: `${9 * S}px`, align: 'left', S });
-    glowText(g, card.en, x + 52 * S, y + 28 * S, { font: `300 ${11.5 * S}px ${FONTS.mono}`, color: COLORS.paper, alpha: a * 0.62, glow: 0, blur: blur * 0.6, spacing: `${4.2 * S}px`, align: 'left', S });
+    const k = TYPE.card;
+    glowText(g, card.zh, x + 52 * S, y, { font: `${TYPE.zhWeight} ${22 * S * k}px ${FONTS.zh}`, color: COLORS.paper, alpha: a, glow: 0.25, blur: blur * 0.6, spacing: `${9 * S * k}px`, align: 'left', S });
+    glowText(g, card.en, x + 52 * S, y + 28 * S * k, { font: `300 ${11.5 * S * k}px ${FONTS.mono}`, color: COLORS.paper, alpha: a * 0.62, glow: 0, blur: blur * 0.6, spacing: `${4.2 * S * k}px`, align: 'left', S });
   }
 }
 
@@ -99,7 +104,7 @@ export function hudCallout(g, { anchor, dir = [1, -0.6], len = 120, lines = [], 
   const kLine = ease.outCubic(clamp(t / 0.55));
   const ex = ax + ux * len * S * kLine, ey = ay + uy * len * S * kLine;
   const right = align === 'auto' ? ux >= 0 : align === 'right';
-  const shelf = 46 * S * ease.outCubic(clamp((t - 0.45) / 0.35));
+  const shelf = 46 * S * Math.sqrt(TYPE.hud) * ease.outCubic(clamp((t - 0.45) / 0.35));
   g.save();
   g.strokeStyle = rgba(color, alpha * 0.75);
   g.fillStyle = rgba(color, alpha * 0.9);
@@ -111,7 +116,7 @@ export function hudCallout(g, { anchor, dir = [1, -0.6], len = 120, lines = [], 
   g.beginPath(); g.moveTo(ax + ux * box * 0.7, ay + uy * box * 0.7); g.lineTo(ex, ey);
   g.lineTo(ex + (right ? shelf : -shelf), ey); g.stroke();
   // 文本
-  const tx = ex + (right ? 8 * S : -8 * S), ty = ey - 9 * S;
+  const tx = ex + (right ? 8 * S : -8 * S), ty = ey - 9 * S * TYPE.hud;
   g.textAlign = right ? 'left' : 'right';
   g.textBaseline = 'alphabetic';
   // 每行逐字打出：默认接在上一行之后，ln.at 可指定该行开始的本地时间
@@ -121,7 +126,7 @@ export function hudCallout(g, { anchor, dir = [1, -0.6], len = 120, lines = [], 
     if (ln.at !== undefined) start = Math.max(start, ln.at);
     const n = Math.min(ln.text.length, Math.floor((t - start) * charRate));
     start += ln.text.length / charRate + 0.12;
-    const size = (ln.size || (ln.en ? 9.5 : i === 0 ? 14 : 12.5)) * S;
+    const size = (ln.size || (ln.en ? 9.5 : i === 0 ? 14 : 12.5)) * S * TYPE.hud;
     // 第一行在横线之上，其余行依次在横线之下
     let yy = ty;
     if (i > 0) { below += size * 1.55; yy = below; }
@@ -157,7 +162,7 @@ export function hudBracket(g, { x, y, w, h, t = 1, alpha = 1, S = 1, color = COL
 
 export function hudText(g, text, x, y, { size = 11, alpha = 1, S = 1, color = COLORS.hud, align = 'left', weight = 300, spacing = 0.22 } = {}) {
   g.save();
-  g.font = `${weight} ${size * S}px ${FONTS.mono}`;
+  g.font = `${weight} ${size * S * TYPE.hud}px ${FONTS.mono}`;
   g.letterSpacing = `${spacing * size * S}px`;
   g.textAlign = align;
   g.fillStyle = rgba(color, alpha);
