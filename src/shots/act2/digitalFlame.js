@@ -187,6 +187,7 @@ vec3 lit(vec3 P, vec3 N, vec3 V, vec3 Lp, vec3 col, float I){
   return col * I * (ndl * 0.025 + sp * (0.25 + fr)) / d2;
 }
 void main(){
+  if (uFogK > 0.0 && exp(-max(length(vW - cameraPosition) - 60.0, 0.0) * uFogK) < 0.01) { o = vec4(uFogCol, 1.0); return; }
   vec3 N = normalize(vN); vec3 V = normalize(cameraPosition - vW);
   vec3 own = vec3(vInst.x, uOwnY, vInst.z) + uOwnOff;
   vec3 col = lit(vW, N, V, own, uOwnCol, uOwnI);

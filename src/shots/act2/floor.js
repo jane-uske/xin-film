@@ -57,7 +57,10 @@ float occBox(vec3 P, vec3 Lp, vec2 c, float hw, float Htop){
   return smoothstep(hw * 0.9, hw * 1.25, m);
 }
 void main(){
-  vec3 P = vW; vec3 V = normalize(cameraPosition - P);
+  vec3 P = vW;
+  // 完全没入雾里：直接输出雾色
+  if (uFogK > 0.0 && exp(-max(length(P - cameraPosition) - 60.0, 0.0) * uFogK) < 0.01) { o = vec4(uFogCol, 1.0); return; }
+  vec3 V = normalize(cameraPosition - P);
   vec3 col = vec3(0.0);
   if (uFlameI > 0.0) {
     // 用焰体上下两点近似一团有体积的光源，阴影边缘更软
@@ -76,18 +79,17 @@ void main(){
   if (uLatI > 0.0 && uLat.z > 0.5) {
     float pitch = uLat.y;
     vec2 g = vec2((P.x - uLat.x) / pitch, -P.z / pitch);
-    vec2 g0 = floor(g + 0.5);
+    vec2 g0 = floor(g);
     float fw = length(fwidth(g));
     float lod = smoothstep(0.08, 0.3, fw);
     vec3 acc = vec3(0.0);
     if (lod < 1.0) {
-      for (int dj = -1; dj <= 1; dj++) for (int di = -1; di <= 1; di++) {
+      for (int dj = 0; dj <= 1; dj++) for (int di = 0; di <= 1; di++) {
         vec2 c = g0 + vec2(float(di), float(dj));
         if (c.x < 0.0 || c.y < 0.0 || c.x >= uLat.z || c.y >= uLat.w) continue;
         if (c.x < 0.5 && c.y < 0.5) continue; // 原初那一团单独算
         vec3 Lp = vec3(uLat.x + c.x * pitch, uLatFlameY, -c.y * pitch);
-        vec3 Lq = Lp + vec3(0.0, 1.2, 0.0);
-        float sh = 0.5 * occBox(P, Lp, Lp.xz, uPlinth.x, uPlinth.y) + 0.5 * occBox(P, Lq, Lp.xz, uPlinth.x, uPlinth.y);
+        float sh = occBox(P, Lp + vec3(0.0, 0.6, 0.0), Lp.xz, uPlinth.x, uPlinth.y);
         acc += lightAt(P, V, Lp, uLatCol, uLatI) * sh;
       }
     }

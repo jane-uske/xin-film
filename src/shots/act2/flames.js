@@ -94,8 +94,8 @@ export default async function create(ctx) {
   function poseCandlePush(T, st) {
     const u = ease.inOutSine(invLerp(cue('flame_catch') + 0.3, cue('track_right'), T));
     const c = flameCenterC(st);
-    const tg = V3(0, lerp(st.wickY + 0.2, c.y + 0.05, u), 0);
-    const dist = logLerp(25, 14.5, u);
+    const tg = V3(0, lerp(st.wickY + 0.2, c.y - 0.75, u), 0);
+    const dist = logLerp(25, 15.8, u);
     return { tg, dist, az: lerp(-0.035, 0.0, u), el: lerp(5.0, 2.4, u) * D2R, hand: 1 };
   }
   const twoShot = (y) => ({ tg: V3(DIG.X / 2, y, 0), dist: 26, az: 0, el: 2.0 * D2R });
@@ -246,7 +246,7 @@ export default async function create(ctx) {
     const lit = T >= catchT;
     // S17：一阵共同的气流，两焰向彼此倾斜；焰尖伸长
     const lean = smoothstep(cue('lean_start'), cue('lean_start') + 5, T) * 0.55 + smoothstep(cue('bridge_start'), cue('cut_black'), T) * 0.72;
-    const stretch = 1 + smoothstep(cue('bridge_start'), cue('cut_black'), T) * 0.3;
+    const stretch = 1 + smoothstep(cue('bridge_start'), cue('cut_black'), T) * 0.12;
     const flC = flicker(util, T, 0, {
       lenMul: (0.25 + 0.75 * grow) * stretch * (st.H < 7 ? 0.97 : 1), widMul: 0.55 + 0.45 * grow,
       flutterAdd: (1 - grow) * 0.8 + lean * 0.15, leanX: lean,
@@ -274,12 +274,12 @@ export default async function create(ctx) {
     const burn = smoothstep(cue('self_burn_start'), cue('cut_black'), T);
     const leanD = -lean;
     const flO = flicker(util, tfD + Math.min(delta, 30), own > 0 ? 0.0 : 0, {
-      lenMul: (1 - 0.3 * burn) * stretch, widMul: 1 - 0.18 * burn, flutterAdd: 0.25 * burn + 0.1 * own, ripMul: 1 + 0.6 * burn, leanX: leanD,
+      lenMul: (1 - 0.3 * burn) * (1 + 0.36 * lean / 1.27) * stretch, widMul: (1 - 0.18 * burn) * (1 + 0.1 * lean / 1.27), flutterAdd: 0.25 * burn + 0.1 * own, ripMul: 1 + 0.6 * burn, leanX: leanD,
     });
     // 失步之后，加入它自己的、不可复现的摆动
     if (own > 0) {
       const ex = flicker(util, T * 1.07, 3.3);
-      flO.f0[0] = lerp(flO.f0[0], ex.f0[0] * 1.3 + leanD, own); flO.f0[2] = lerp(flO.f0[2], ex.f0[2] * (1 - 0.3 * burn) * stretch, own * 0.6);
+      flO.f0[0] = lerp(flO.f0[0], ex.f0[0] * 1.3 + leanD, own); flO.f0[2] = lerp(flO.f0[2], ex.f0[2] * (1 - 0.3 * burn) * (1 + 0.36 * lean / 1.27) * stretch, own * 0.6);
       flO.f1[2] = lerp(flO.f1[2], ex.f1[2], own);
     }
     const digVisible = T >= digOn - 0.6;
@@ -427,9 +427,11 @@ export default async function create(ctx) {
         const z = (1 - t) * (1 - t) * a.z + 2 * (1 - t) * t * mid.z + t * t * b.z;
         // 颤动：越靠近自由端越抖
         y += (0.03 * Math.sin(T * 9.0 + v * 7.0 + side * 2.1) + 0.015 * Math.sin(T * 23.0 + v * 13.0 + side)) * v;
-        const br = (1 - 0.6 * v) * (0.7 + 0.3 * Math.sin(T * 13.0 + side * 3.0 + v * 5.0)) * on;
-        parts.point(x, y, z, 1.0 * br * 1.6, 0.6 * br * 1.6, 0.24 * br * 1.6, 1.7);
-        if (i % 3 === 0) parts.point(x, y, z, 0.12 * br, 0.07 * br, 0.03 * br, 10);
+        // 根部（焰尖）亮，向自由端渐隐；亮度沿丝缓慢游动
+        const br = Math.pow(1 - v, 1.4) * (0.65 + 0.35 * Math.sin(T * 11.0 + side * 3.0 - v * 9.0)) * on;
+        parts.point(x, y, z, 1.0 * br * 3.2, 0.7 * br * 3.2, 0.36 * br * 3.2, 1.3);
+        if (i % 2 === 0) parts.point(x, y, z, 0.42 * br, 0.26 * br, 0.1 * br, 9);
+        if (i % 6 === 0) parts.point(x, y, z, 0.05 * br, 0.03 * br, 0.012 * br, 26);
       }
     }
   }

@@ -49,6 +49,15 @@ ${fogGLSL}
 ${flameGLSL}
 in vec2 vP; in vec2 vRight; in vec3 vW; in float vNew; out vec4 o;
 void main(){
+  // 提前退出：完全没入雾里的、以及在火焰包络之外的像素
+  float dcam = length(vW - cameraPosition);
+  if (uFogK > 0.0 && exp(-max(dcam - 60.0, 0.0) * uFogK) < 0.01) discard;
+  {
+    float s0 = flS(vP.y, uF0);
+    if (s0 < -0.02 || s0 > 1.02) discard;
+    float c0 = dot(flCenter(s0, vP.y, uF0, uF1), vRight);
+    if (abs(vP.x - c0) > flHalfW(s0, uF0) * 1.08 + 0.06) discard;
+  }
   float cx = ${(2 * DIG.box.x).toFixed(3)} / uN, cy = ${(DIG.box.y1 - DIG.box.y0).toFixed(3)} / (2.0 * uN);
   vec2 q = vec2((vP.x + ${DIG.box.x.toFixed(3)}) / cx, (vP.y - (${DIG.box.y0.toFixed(3)})) / cy);
   vec2 qc = floor(q) + 0.5;
@@ -134,7 +143,7 @@ export function makeLattice(ctx, shared, digital) {
 
   // B：网点公告板
   const qg = new THREE.InstancedBufferGeometry();
-  qg.setAttribute('position', new THREE.Float32BufferAttribute([-1.2, -0.5, 0, 1.2, -0.5, 0, 1.2, 4.6, 0, -1.2, 4.6, 0], 3));
+  qg.setAttribute('position', new THREE.Float32BufferAttribute([-0.8, -0.42, 0, 0.8, -0.42, 0, 0.8, 4.3, 0, -0.8, 4.3, 0], 3));
   qg.setIndex([0, 1, 2, 0, 2, 3]);
   const cellB = new Float32Array(Bs.length * 2), birthB = new Float32Array(Bs.length);
   Bs.forEach((c, k) => { cellB[k * 2] = c[0]; cellB[k * 2 + 1] = c[1]; birthB[k] = c[2]; });

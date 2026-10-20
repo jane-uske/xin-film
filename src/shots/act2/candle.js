@@ -60,7 +60,7 @@ vec3 waxLight(vec3 P, vec3 N, vec3 V){
   float side = 1.0 - smoothstep(0.25, 0.9, zn);
   float rim = pow(1.0 - abs(dot(N, V)), 2.0);
   // 杯沿最薄：透光最强；向下指数衰减，颜色由黄白变为橙红
-  vec3 trans = exp(-depthTop * vec3(1.55, 2.35, 3.5));
+  vec3 trans = exp(-depthTop * vec3(2.0, 2.9, 4.0));
   float thin = 0.45 + 0.55 * exp(-wall * 0.8);
   vec3 col = trans * sss * thin * (0.75 + 0.6 * rim) * vec3(1.0, 0.56, 0.26) * 0.66;
   // 杯沿唇口：一圈亮边
@@ -69,7 +69,7 @@ vec3 waxLight(vec3 P, vec3 N, vec3 V){
   // 蜡泪是一道凸起的棱：棱脊更透更亮，两侧边缘更暗
   col *= mix(1.0, mix(0.45, 1.35, pow(max(dot(N, V), 0.0), 1.3)), drip);
   // 蜡本身是白的：一层很淡的漫散射，让形体在暗处仍可读
-  col += vec3(1.0, 0.82, 0.66) * uFlameI * 0.018 * exp(-depthTop * 0.25) / (1.0 + 0.02 * dF * dF);
+  col += vec3(1.0, 0.82, 0.66) * uFlameI * 0.008 * exp(-depthTop * 0.6) / (1.0 + 0.02 * dF * dF);
   // 2) 直接光（顶部肩面、熔池、蜡泪顶面）
   vec3 L = normalize(uFlamePos - P);
   float ndl = max(dot(N, L), 0.0);
