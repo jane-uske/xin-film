@@ -350,7 +350,7 @@ export default async function create(ctx) {
     lattice.update({ n, since, fl: flL, gainA: 0.7 / (0.98 * LV[4].size * LV[4].size / 4), px, fade, latI: 0.6 * flL.f1[3] });
     if (!lattice.group.visible) shared.uLatI.value = 0;
     // 雾：只在火海里
-    shared.uFogK.value = inMach && T < cue('cut_black') ? (T < cue('ch3_in') - 0.5 ? 1 / 1100 : 1 / 300) : 0;
+    shared.uFogK.value = inMach && T < cue('cut_black') ? (T < cue('ch3_in') - 0.5 ? 1 / 1100 : 1 / 45) : 0;
     shared.uFogCol.value.set(0.0, 0.0, 0.0);
 
     // 地面：S11–S12 的微距镜头里看不到地面，省掉它
@@ -534,7 +534,6 @@ export default async function create(ctx) {
     overlay.withGlitch(g, gl, (f.frame * 104729) % 100000 + 7, W, H, draw);
   }
 
-  globalThis.__act2 = { lattice, digital };
   return {
     msaa: 0,
     render,
