@@ -504,9 +504,9 @@ export default async function create(ctx) {
     dc.passU.uScan.value = scanAt(T);
     dc.passU.uExp.value = 1.0;
     netHeatU.uHeat.value = 1.0;
-    netHeatU.uGain.value = 0.045 * (1 - smoothstep(T_PO + 1.2, T_PO + 2.4, T));
+    netHeatU.uGain.value = 0.03 * (1 - smoothstep(T_PO + 1.2, T_PO + 2.4, T));
     netHeat.visible = netHeatU.uGain.value > 0.001;
-    dc.plU.uI.value = smoothstep(cue.dc - 1, cue.dc + 2, T);
+    dc.plU.uI.value = smoothstep(cue.dc + 1.0, cue.dc + 2.4, T);
     dc.U.uFog.value = lerp(1 / (22000 * MM), 1 / (900000 * MM), smoothstep(cue.dc + 0.7, cue.dc + 1.9, T)) * smoothstep(T_PO + 0.8, T_PO + 1.6, T);
   }
 
@@ -547,9 +547,6 @@ export default async function create(ctx) {
     },
     overlay(g, f) {
       const T = f.T, S = f.S;
-      // Work-around (still needed with the engine's per-frame canvas reset): when a frame draws nothing,
-      // Chromium can keep uploading the previous overlay snapshot. One near-invisible pixel forces a fresh one.
-      g.save(); g.fillStyle = 'rgba(0,0,0,0.004)'; g.fillRect(0, 0, 1, 1); g.restore();
       const proj = (v) => ctx.project(new THREE.Vector3(v[0], v[1], v[2]), cam);
       const camR = new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld, 0);
       const camU = new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld, 1);

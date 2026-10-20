@@ -195,13 +195,14 @@ export default async function create(ctx) {
   }
   // S16：贴地沿一排复制体滑行，最初那一团最近
   function rowGlide(T) {
-    // 从左前方、略高处看：最初那一团在左三分之一、画面偏上；它身后是一排排退向远处的复制体；蜡烛在画外左后方
+    // 从左前方、略高于焰心处看：最初那一团在左侧约四分之一处；它身后是一排排退向远处、隐入黑暗的复制体；
+    // 蜡烛在画外左后方。镜头匀速滑行，同时匀速微摇，让它始终停在同一处
     const a = cue('ch3_in') - 0.5, b = cue('lattice_fade') + 2.0;
     const u = (T - a) / (b - a);
-    const pos = V3(lerp(5.2, 3.2, u), 13.0, lerp(15.5, 14.5, u));
-    const yaw = 26 * D2R;
-    const oc = V3(DIG.X, DIG.wickY + 1.6, 0);
-    const pitch = Math.atan2(oc.y - pos.y, Math.hypot(oc.x - pos.x, oc.z - pos.z)) - 4.5 * D2R;
+    const pos = V3(lerp(5.2, 3.2, u), 14.3, lerp(15.5, 14.5, u));
+    const bearing = Math.atan2(DIG.X - pos.x, pos.z);
+    const yaw = bearing + 15 * D2R;
+    const pitch = -12 * D2R;
     const dir = V3(Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), -Math.cos(yaw) * Math.cos(pitch));
     return { pos, tg: pos.clone().add(dir.multiplyScalar(40)), hand: smoothstep(cue('warm_shift_start'), cue('warm_shift_end'), T) * 0.9 };
   }
