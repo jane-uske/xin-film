@@ -7,6 +7,9 @@ import { ROOT, timeline, parseArgs } from './lib.mjs';
 
 const args = parseArgs();
 const tl = timeline();
+// 出品方署名与画面一致：读本地 credit.local.json（不进仓库），缺省 ASTRA
+const creditFile = path.join(ROOT, 'credit.local.json');
+const credit = fs.existsSync(creditFile) ? JSON.parse(fs.readFileSync(creditFile, 'utf8')).word || 'ASTRA' : 'ASTRA';
 const preview = !!args.preview;
 const dir = path.join(ROOT, 'out', preview ? 'preview' : 'chunks');
 const chunks = fs.readdirSync(dir).filter((f) => /^c\d{3}\.mkv$/.test(f)).sort();
@@ -24,7 +27,7 @@ a.push('-map', '0:v:0');
 if (fs.existsSync(audio)) a.push('-map', '1:a:0', '-c:a', 'aac', '-b:a', '256k');
 a.push('-vf', vf, '-c:v', 'libx264', '-preset', preview ? 'fast' : 'slow', '-crf', crf, '-tune', 'grain', '-pix_fmt', 'yuv420p',
   '-color_primaries', 'bt709', '-color_trc', 'bt709', '-colorspace', 'bt709', '-movflags', '+faststart',
-  '-metadata', 'title=芯 XIN', '-metadata', 'artist=ASTRA', '-t', String(tl.duration), out);
+  '-metadata', 'title=芯 XIN', '-metadata', `artist=${credit}`, '-t', String(tl.duration), out);
 execFileSync('ffmpeg', a, { stdio: 'inherit' });
 const size = fs.statSync(out).size / 1e6;
 console.log(`${out}  ${size.toFixed(1)} MB`);

@@ -1,8 +1,8 @@
 // 联系表（看运动/节奏用）：node tools/sheet.mjs --from 30 --to 92 [--n 16] [--cols 4] [--scale 0.5] [--out out/sheets/name.png]
 // 也可用 --shot A1 指定镜头区间
+// 时间戳与拼图在浏览器里完成，不依赖 ffmpeg 的 drawtext（Homebrew 版 ffmpeg 不带 freetype）
 import fs from 'node:fs';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
 import { ROOT, timeline, parseArgs, startServer, launch, openFilm } from './lib.mjs';
 
 const args = parseArgs();
@@ -12,30 +12,34 @@ if (args.shot) { const s = tl.shots.find((x) => x.id === args.shot); from = s.st
 const n = parseInt(args.n || '16', 10), cols = parseInt(args.cols || '4', 10);
 const scale = parseFloat(args.scale || '0.5');
 const out = path.resolve(ROOT, args.out || `out/sheets/${args.shot || `${from}-${to}`}.png`);
-const tmp = path.join(ROOT, 'out', '.sheet-tmp-' + process.pid);
-fs.mkdirSync(tmp, { recursive: true });
 fs.mkdirSync(path.dirname(out), { recursive: true });
 const port = parseInt(args.port || String(9300 + Math.floor(Math.random() * 600)), 10);
 const server = await startServer(port, async () => {});
 const W = Math.round(tl.width * scale), H = Math.round(tl.height * scale);
 const { browser, page } = await launch({ width: W, height: H });
 await openFilm(page, port, `render=1&scale=${scale}`);
+const cells = [];
 for (let i = 0; i < n; i++) {
   const t = from + ((to - from) * (i + 0.5)) / n;
   const frame = Math.round(t * tl.fps);
   await page.evaluate((f) => window.FILM.renderFrame(f), frame);
-  await page.locator('#film').screenshot({ path: path.join(tmp, `${String(i).padStart(3, '0')}.png`) });
-  fs.writeFileSync(path.join(tmp, `${String(i).padStart(3, '0')}.txt`), `${t.toFixed(2)}s`);
+  const png = await page.locator('#film').screenshot();
+  cells.push({ src: `data:image/png;base64,${png.toString('base64')}`, label: `${t.toFixed(2)}s` });
 }
+// 每格 480 宽、打上时间戳，格间 4px 深灰
+const CW = 480, CH = Math.round((CW * H) / W), PAD = 4;
+const rows = Math.ceil(n / cols);
+const SW = cols * CW + (cols - 1) * PAD, SH = rows * CH + (rows - 1) * PAD;
+const sheet = await browser.newPage({ viewport: { width: SW, height: SH }, deviceScaleFactor: 1 });
+await sheet.setContent(`<!doctype html><html><body style="margin:0;background:#202020">
+  <div style="display:grid;grid-template-columns:repeat(${cols},${CW}px);gap:${PAD}px">
+  ${cells.map((c) => `<div style="position:relative;width:${CW}px;height:${CH}px">
+    <img src="${c.src}" style="display:block;width:${CW}px;height:${CH}px">
+    <span style="position:absolute;left:6px;top:6px;padding:1px 3px;font:14px Menlo,'DejaVu Sans Mono',monospace;color:rgba(255,255,255,.85);background:rgba(0,0,0,.5)">${c.label}</span>
+  </div>`).join('')}
+  </div></body></html>`);
+await sheet.waitForFunction(() => [...document.images].every((im) => im.complete));
+await sheet.screenshot({ path: out });
 await browser.close();
 server.close();
-// 每张图打上时间戳再拼
-const font = '/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf';
-for (let i = 0; i < n; i++) {
-  const b = path.join(tmp, String(i).padStart(3, '0'));
-  execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-i', `${b}.png`, '-vf', `scale=480:-1,drawtext=fontfile=${font}:textfile=${b}.txt:x=6:y=6:fontsize=14:fontcolor=white@0.85:box=1:boxcolor=black@0.5`, `${b}_l.png`]);
-}
-const rows = Math.ceil(n / cols);
-execFileSync('ffmpeg', ['-y', '-loglevel', 'error', '-framerate', '1', '-i', path.join(tmp, '%03d_l.png'), '-vf', `tile=${cols}x${rows}:padding=4:color=0x202020`, '-frames:v', '1', out]);
-fs.rmSync(tmp, { recursive: true, force: true });
 console.log(out);

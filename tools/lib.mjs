@@ -11,7 +11,7 @@ export const timeline = () => JSON.parse(fs.readFileSync(path.join(ROOT, 'timeli
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.json': 'application/json; charset=utf-8', '.css': 'text/css; charset=utf-8', '.woff2': 'font/woff2', '.woff': 'font/woff', '.wav': 'audio/wav', '.png': 'image/png' };
 
 // 不带值的开关，避免把后面的参数（如时间点）当成它的值吃掉
-const FLAGS = new Set(['gpu', 'force', 'preview']);
+const FLAGS = new Set(['gpu', 'headed', 'force', 'preview']);
 
 export function parseArgs(argv = process.argv.slice(2)) {
   const out = { _: [] };
@@ -39,6 +39,8 @@ export function startServer(port, onFrame) {
       });
       return;
     }
+    // 完整版 Chromium（--gpu）会自动请求 favicon，回个空响应，免得日志里冒出 404
+    if (url.pathname === '/favicon.ico') { res.writeHead(204); res.end(); return; }
     const f = path.join(ROOT, decodeURIComponent(url.pathname === '/' ? '/index.html' : url.pathname));
     if (!f.startsWith(ROOT)) { res.writeHead(403); res.end(); return; }
     fs.readFile(f, (e, d) => {
@@ -51,12 +53,13 @@ export function startServer(port, onFrame) {
 }
 
 // 默认用 SwiftShader 软件渲染（任何机器都能跑，含无显卡的云容器）；
-// 带 --gpu 时打开一个有界面的浏览器窗口，用本机显卡渲染，快几十倍。两种方式画面一致，但同一部片请用同一种方式渲完
-export async function launch({ width, height, gpu = process.argv.includes('--gpu') }) {
+// 带 --gpu 时用本机显卡（新版无头模式，Mac 上走 ANGLE/Metal，不弹窗口），快得多。
+// 两种方式画面只差浮点舍入（全片抽样平均差约 1/255），但同一部片请用同一种方式渲完。--headed 显示浏览器窗口，排查用
+export async function launch({ width, height, gpu = process.argv.includes('--gpu'), headed = process.argv.includes('--headed') }) {
   const common = ['--ignore-gpu-blocklist', '--disable-gpu-watchdog', '--disable-background-timer-throttling', '--disable-renderer-backgrounding', '--disable-backgrounding-occluded-windows'];
   const browser = await chromium.launch(gpu
-    ? { headless: false, args: [...common, '--enable-gpu', `--window-size=${width},${height + 120}`] }
-    : { args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', ...common] });
+    ? { channel: 'chromium', headless: !headed, args: [...common, '--enable-gpu', `--window-size=${width},${height + 120}`] }
+    : { headless: !headed, args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', ...common] });
   const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor: 1 });
   page.on('console', (m) => { const t = m.text(); if (m.type() === 'error' || m.type() === 'warning' || t.startsWith('[')) console.log(`  [page:${m.type()}] ${t}`); });
   page.on('pageerror', (e) => console.error('  [pageerror]', e.message));

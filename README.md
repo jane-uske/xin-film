@@ -17,12 +17,19 @@ node tools/build.mjs                   # 拼接 + 2.39:1 遮幅 + 混入配乐 -
 
 需要：Node.js 18+、Python 3（`pip install numpy scipy matplotlib`）、ffmpeg（macOS：`brew install ffmpeg`）。
 
+若 `pip install` 报 externally-managed（uv 或 Homebrew 管理的 Python），就在本目录建虚拟环境，之后把 `python3` 换成 `.venv/bin/python`：
+
+```bash
+uv venv .venv && uv pip install --python .venv/bin/python numpy scipy matplotlib
+.venv/bin/python audio/score.py
+```
+
 ```bash
 npm install
 npx playwright install chromium        # 下载渲染用的浏览器
 echo '{ "word": "你的署名" }' > credit.local.json   # 可选，见下文
 python3 audio/score.py
-node tools/render.mjs --jobs 2 --gpu   # 用本机显卡；会弹出浏览器窗口，渲染时别最小化
+node tools/render.mjs --jobs 2 --gpu   # 用本机显卡（无头，不弹窗口；加 --headed 可看到窗口）
 node tools/build.mjs
 ```
 
