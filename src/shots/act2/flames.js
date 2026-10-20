@@ -83,6 +83,13 @@ export default async function create(ctx) {
 
   const flameCenterC = (st) => V3(0, st.wickY + 1.35, 0);
   const flameCenterD = () => V3(DIG.X, DIG.wickY + 1.35, 0);
+  // 第三幕末：原初那一团的石柱也在燃烧、变矮变细；火海隐去时它滑到蜡烛身边，焰底与烛芯齐平
+  const DIG_NEAR = 4.4;
+  function digPose(T, st) {
+    const k = smootherstep(cue('lattice_fade'), cue('lean_start') - 0.5, T);
+    const top = lerp(DIG.plinthH, st.wickY - 0.36 - DIG.chipH, k);
+    return { x: lerp(DIG.X, DIG_NEAR, k), top, wickY: top + DIG.chipH + 0.36, sc: lerp(1, 0.7, k), k };
+  }
 
   function poseCandlePush(T, st) {
     const u = ease.inOutSine(invLerp(cue('flame_catch') + 0.3, cue('track_right'), T));
@@ -144,15 +151,15 @@ export default async function create(ctx) {
       const ta = cue('lattice_fade'), tb = cue('candle_reenter'), tc = cue('lean_start') + 0.5, te = cue('cut_black');
       const g = rowGlide(ta);
       const gpos = g.pos;
-      const fin = { tg: V3(DIG.X / 2 + 0.2, lerp(st.wickY, DIG.wickY, 0.5) + 1.0, 0), dist: 26, az: 0.02, el: 11 * D2R };
+      const fin = { tg: V3(DIG_NEAR / 2, st.wickY + 1.6, 0), dist: 23, az: 0.0, el: 7 * D2R };
       const posF = orbit(fin.tg, fin.dist, fin.az, fin.el);
       if (T < tc) {
         const u = ease.inOutSine(invLerp(ta, tc, T));
         P = { pos: gpos.clone().lerp(posF, u), tg: g.tg.clone().lerp(fin.tg, ease.inOutSine(invLerp(ta - 0.5, tc, T))), hand: 1 };
       } else {
         const u = ease.inOutSine(invLerp(tc, te + 1.5, T));
-        const tg = fin.tg.clone().lerp(V3(DIG.X / 2, lerp(st.wickY, DIG.wickY, 0.5) + 2.0, 0), u);
-        P = { tg, dist: lerp(26, 20.5, u), az: 0.02, el: lerp(11, 7, u) * D2R, hand: 1 };
+        const tg = fin.tg.clone().lerp(V3(DIG_NEAR / 2, st.wickY + 2.15, 0), u);
+        P = { tg, dist: lerp(23, 16.0, u), az: 0.0, el: lerp(7, 5, u) * D2R, hand: 1 };
       }
     }
     if (!P.pos) P.pos = orbit(P.tg, P.dist, P.az, P.el);
@@ -188,14 +195,16 @@ export default async function create(ctx) {
   }
   // S16：贴地沿一排复制体滑行，最初那一团最近
   function rowGlide(T) {
+    // 从左前方、略高处看：最初那一团在左三分之一、画面偏上；它身后是一排排退向远处的复制体；蜡烛在画外左后方
     const a = cue('ch3_in') - 0.5, b = cue('lattice_fade') + 2.0;
     const u = (T - a) / (b - a);
-    const pos = V3(lerp(13.6, 10.6, u), 10.6, 9.6);
-    const yaw = -12 * D2R;
-    const tg = pos.clone().add(V3(Math.sin(yaw) * 40, 0.0, -Math.cos(yaw) * 40));
-    return { pos, tg, hand: smoothstep(cue('warm_shift_start'), cue('warm_shift_end'), T) * 0.9 };
+    const pos = V3(lerp(5.2, 3.2, u), 13.0, lerp(15.5, 14.5, u));
+    const yaw = 26 * D2R;
+    const oc = V3(DIG.X, DIG.wickY + 1.6, 0);
+    const pitch = Math.atan2(oc.y - pos.y, Math.hypot(oc.x - pos.x, oc.z - pos.z)) - 4.5 * D2R;
+    const dir = V3(Math.sin(yaw) * Math.cos(pitch), Math.sin(pitch), -Math.cos(yaw) * Math.cos(pitch));
+    return { pos, tg: pos.clone().add(dir.multiplyScalar(40)), hand: smoothstep(cue('warm_shift_start'), cue('warm_shift_end'), T) * 0.9 };
   }
-
   function applyCamera(T, st) {
     const P = camPose(T, st);
     camera.position.copy(P.pos);
@@ -224,6 +233,7 @@ export default async function create(ctx) {
   function render(f) {
     const T = f.T, S = f.S;
     const st = candleState(util, cue, T);
+    const dp = digPose(T, st);
     applyCamera(T, st);
     const px = pxScale();
     const Tm = Tmach(T);
@@ -234,7 +244,7 @@ export default async function create(ctx) {
     const grow = ease.outCubic(clamp((T - catchT) / 1.6));
     const lit = T >= catchT;
     // S17：一阵共同的气流，两焰向彼此倾斜；焰尖伸长
-    const lean = smoothstep(cue('lean_start'), cue('lean_start') + 4.5, T) * 0.5 + smoothstep(cue('bridge_start'), cue('cut_black'), T) * 0.75;
+    const lean = smoothstep(cue('lean_start'), cue('lean_start') + 5, T) * 0.55 + smoothstep(cue('bridge_start'), cue('cut_black'), T) * 0.72;
     const stretch = 1 + smoothstep(cue('bridge_start'), cue('cut_black'), T) * 0.3;
     const flC = flicker(util, T, 0, {
       lenMul: (0.25 + 0.75 * grow) * stretch * (st.H < 7 ? 0.97 : 1), widMul: 0.55 + 0.45 * grow,
@@ -261,7 +271,7 @@ export default async function create(ctx) {
     const delta = T < dsy ? 0 : 0.003 * Math.exp((T - dsy) * 1.25) - 0.003 + 0.003 * smoothstep(dsy, dsy + 0.2, T);
     const own = smoothstep(cue('warm_shift_start'), cue('warm_shift_end'), T);
     const burn = smoothstep(cue('self_burn_start'), cue('cut_black'), T);
-    const leanD = -lean * 0.9;
+    const leanD = -lean;
     const flO = flicker(util, tfD + Math.min(delta, 30), own > 0 ? 0.0 : 0, {
       lenMul: (1 - 0.3 * burn) * stretch, widMul: 1 - 0.18 * burn, flutterAdd: 0.25 * burn + 0.1 * own, ripMul: 1 + 0.6 * burn, leanX: leanD,
     });
@@ -280,7 +290,7 @@ export default async function create(ctx) {
     digital.origPts.forEach((p, k) => { p.visible = digVisible && k === lvl && appear > 0 && soft < 0.999; });
     const geoL = digital.levels[lvl];
     o.uF0.value.fromArray(flO.f0); o.uF1.value.fromArray(flO.f1);
-    o.uOrigin.value.set(DIG.X, DIG.wickY, 0);
+    o.uOrigin.value.set(dp.x, dp.wickY, 0);
     o.uCell.value.fromArray(geoL.userData.cell);
     o.uQ.value = L.Q; o.uVox.value = L.vox; o.uSize.value = L.size;
     // 每个点只覆盖格子的一部分：增益按覆盖率补偿，使平均亮度与烛火一致
@@ -296,8 +306,8 @@ export default async function create(ctx) {
     if (p0) o.uSeed.value.set(p0[0], p0[1] + 0.15, p0[2], 0.42 * smoothstep(1.9, 0.6, Math.hypot(p0[0] - DIG.X, p0[1] - DIG.wickY - 1.4))); else o.uSeed.value.set(0, -100, 0, 0);
     // 连续的暖火（柔化之后接管）
     const wu = digital.warm.u;
-    wu.uOrigin.value.set(DIG.X, DIG.wickY, 0);
-    const cdx = camera.position.x - DIG.X, cdz = camera.position.z;
+    wu.uOrigin.value.set(dp.x, dp.wickY, 0);
+    const cdx = camera.position.x - dp.x, cdz = camera.position.z;
     const cl = Math.hypot(cdx, cdz) || 1;
     wu.uRight.value.set(cdz / cl, -cdx / cl);
     wu.uF0.value.fromArray(flO.f0); wu.uF1.value.fromArray(flO.f1);
@@ -308,7 +318,12 @@ export default async function create(ctx) {
     const cyan = V3(0.2, 0.75, 1.0), white = V3(0.95, 0.95, 0.95), amber = V3(1.0, 0.5, 0.18);
     const dcol = warm < 0.5 ? cyan.clone().lerp(white, warm * 2) : white.clone().lerp(amber, warm * 2 - 1);
     shared.uDigCol.value.copy(dcol);
-    shared.uDigPos.value.set(DIG.X, DIG.wickY + 1.2, 0);
+    shared.uDigPos.value.set(dp.x, dp.wickY + 1.2, 0);
+    shared.uPlinth.value.set(DIG.plinthHW * dp.sc, dp.top + DIG.chipH);
+    digital.plinth.position.set(dp.x, 0, 0);
+    digital.plinth.scale.set(dp.sc, dp.top / DIG.plinthH, dp.sc);
+    digital.chip.position.set(dp.x, dp.top + DIG.chipH / 2, 0);
+    digital.plU.uOwnY.value = dp.wickY + 1.2;
     shared.uDigI.value = digVisible ? (wake * 0.12 + appear * (0.35 + 0.15 * lvl) * flO.f1[3]) * (1 - 0.3 * burn) : 0;
     // 复制开始前光晕褪去：原初那一团必须与它的复制品一模一样
     dHaloU.uGain.value = appear * 0.22 * (1 - soft) * flO.f1[3] * (1 - smoothstep(cue('copy_2') - 1.0, cue('copy_2') - 0.3, T));
@@ -334,7 +349,7 @@ export default async function create(ctx) {
     lattice.update({ n, since, fl: flL, gainA: 0.7 / (0.98 * LV[4].size * LV[4].size / 4), px, fade, latI: 0.6 * flL.f1[3] });
     if (!lattice.group.visible) shared.uLatI.value = 0;
     // 雾：只在火海里
-    shared.uFogK.value = inMach && T < cue('cut_black') ? (T < cue('ch3_in') - 0.5 ? 1 / 1100 : 1 / 500) : 0;
+    shared.uFogK.value = inMach && T < cue('cut_black') ? (T < cue('ch3_in') - 0.5 ? 1 / 1100 : 1 / 300) : 0;
     shared.uFogCol.value.set(0.0, 0.0, 0.0);
 
     // 地面：S11–S12 的微距镜头里看不到地面，省掉它
@@ -354,14 +369,14 @@ export default async function create(ctx) {
     parts.match(m);
     parts.burn(T, cue, seedBurnPos, st, candle.waxU.uAsh.value);
     parts.curl(T, cue, seedBurnPos);
-    parts.embers(T, cue, [DIG.X, DIG.wickY, 0], burn > 0 ? smoothstep(cue('self_burn_start'), cue('self_burn_start') + 1.5, T) : 0, flO.f0[2]);
+    parts.embers(T, cue, [dp.x, dp.wickY, 0], burn > 0 ? smoothstep(cue('self_burn_start'), cue('self_burn_start') + 1.5, T) : 0, flO.f0[2]);
     // 机器醒来：芯片上先亮起一个青色的点
     if (digVisible && !away) {
       const wp = wake * (1 - 0.85 * appear) * (1 - smoothstep(cue('self_burn_start'), cue('self_burn_start') + 2, T));
-      if (wp > 0.001) parts.point(DIG.X, DIG.plinthH + DIG.chipH + 0.04, 0, 0.6 * wp * 22, 2.4 * wp * 22, 3.2 * wp * 22, 7);
+      if (wp > 0.001) parts.point(dp.x, dp.top + DIG.chipH + 0.04, 0, 0.6 * wp * 22, 2.4 * wp * 22, 3.2 * wp * 22, 7);
     }
     // 光桥
-    if (T >= cue('bridge_start')) bridge(T, st, flC, flO);
+    if (T >= cue('bridge_start')) bridge(T, st, flC, flO, dp);
     parts.end(S);
     // 微尘：只在蜡烛的特写里
     const dustAmt = (1 - smoothstep(cue('track_right'), cue('track_right') + 2.5, T)) * smoothstep(catchT, catchT + 2, T)
@@ -378,8 +393,8 @@ export default async function create(ctx) {
     ctx.renderer.render(scene, camera);
 
     // ---- HUD 数据 ----
-    hud = { T, Tm, n, powerOff, origScreen: ctx.project(V3(DIG.X, DIG.wickY + 1.6, 0), camera), lvl,
-      origTop: ctx.project(V3(DIG.X, DIG.wickY + 3.15, 0), camera), origBot: ctx.project(V3(DIG.X, DIG.wickY - 0.15, 0), camera) };
+    hud = { T, Tm, n, powerOff, origScreen: ctx.project(V3(dp.x, dp.wickY + 1.6, 0), camera), lvl,
+      origTop: ctx.project(V3(dp.x, dp.wickY + 3.15, 0), camera), origBot: ctx.project(V3(dp.x, dp.wickY - 0.15, 0), camera) };
 
     // ---- 调色 ----
     return grade(T, powerOff, st);
@@ -392,29 +407,28 @@ export default async function create(ctx) {
     return [1 << a, 1 << b];
   }
 
-  // 光桥：从两焰尖各伸出一根细光丝，在中间几乎接上
-  function bridge(T, st, flC, flO) {
+  // 光桥：两焰尖之间，一缕细弱、颤动的光丝正在形成 —— 最后一帧仍差一线，永不接上
+  function bridge(T, st, flC, flO, dp) {
     const u = smoothstep(cue('bridge_start'), cue('cut_black'), T);
-    const tipC = V3(flC.f0[0] * 1.15, st.wickY + flC.f0[2], flC.f0[1] * 1.15);
-    const tipD = V3(DIG.X + flO.f0[0] * 1.15, DIG.wickY + flO.f0[2], flO.f0[1] * 1.15);
-    const mid = tipC.clone().lerp(tipD, 0.5); mid.y += 0.5;
-    const reach = 0.5 * Math.pow(u, 0.85) * 0.985;   // 0.5 = 接上；最后一帧仍差一线
-    const N = 280;
+    const tipC = V3(flC.f0[0] * 1.15, st.wickY + flC.f0[2] * 0.96, flC.f0[1] * 1.15);
+    const tipD = V3(dp.x + flO.f0[0] * 1.15, dp.wickY + flO.f0[2] * 0.96, flO.f0[1] * 1.15);
+    const mid = tipC.clone().lerp(tipD, 0.5); mid.y += 0.1 + 0.04 * Math.sin(T * 1.7);
+    const reach = 0.5 * Math.pow(u, 1.3) * 0.972;
+    const N = 90;
+    const on = smoothstep(0, 0.12, u);
     for (const side of [0, 1]) {
       const a = side === 0 ? tipC : tipD, b = side === 0 ? tipD : tipC;
       for (let i = 0; i < N; i++) {
-        const v = (i / (N - 1)) * reach * 2;    // 0..reach*2 of the way to the midpoint
-        const t = v * 0.5;
-        // 二次贝塞尔 a → mid → b
+        const v = i / (N - 1);
+        const t = v * reach;
         const x = (1 - t) * (1 - t) * a.x + 2 * (1 - t) * t * mid.x + t * t * b.x;
-        const y = (1 - t) * (1 - t) * a.y + 2 * (1 - t) * t * mid.y + t * t * b.y;
+        let y = (1 - t) * (1 - t) * a.y + 2 * (1 - t) * t * mid.y + t * t * b.y;
         const z = (1 - t) * (1 - t) * a.z + 2 * (1 - t) * t * mid.z + t * t * b.z;
-        const wob = 0.05 * Math.sin(T * 3.1 + (i / N) * 6.0 + side * 2) * (i / N);
-        const end = i / (N - 1);
-        const br = (0.35 + 1.4 * Math.pow(end, 3)) * (0.8 + 0.2 * Math.sin(T * 17 + side * 5)) * smoothstep(0, 0.08, u);
-        const col = side === 0 ? [1.0, 0.55, 0.2] : [1.0, 0.62, 0.3];
-        parts.point(x, y + wob, z, col[0] * br * 1.1, col[1] * br * 1.1, col[2] * br * 1.1, 2.4 + 2.4 * Math.pow(end, 4));
-        if (i % 4 === 0) parts.point(x, y + wob, z, col[0] * br * 0.16, col[1] * br * 0.12, col[2] * br * 0.08, 18);
+        // 颤动：越靠近自由端越抖
+        y += (0.03 * Math.sin(T * 9.0 + v * 7.0 + side * 2.1) + 0.015 * Math.sin(T * 23.0 + v * 13.0 + side)) * v;
+        const br = (1 - 0.6 * v) * (0.7 + 0.3 * Math.sin(T * 13.0 + side * 3.0 + v * 5.0)) * on;
+        parts.point(x, y, z, 1.0 * br * 1.6, 0.6 * br * 1.6, 0.24 * br * 1.6, 1.7);
+        if (i % 3 === 0) parts.point(x, y, z, 0.12 * br, 0.07 * br, 0.03 * br, 10);
       }
     }
   }

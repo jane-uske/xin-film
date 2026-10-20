@@ -421,13 +421,13 @@ def flame(n, label, crackle_rate=0.9, size=1.0, flicker=None):
     if flicker is None:
         c1 = smooth_noise(n, 8.0, rng)
         c2 = smooth_noise(n, 0.9, rng)
-        flicker = np.clip(1 + 0.3 * c1 + 0.2 * c2, 0.2, None)
+        flicker = np.clip(1 + 0.17 * c1 + 0.2 * c2, 0.3, None)
     hiss = bp(rng.standard_normal(n), 600.0, 7500.0, 2)
     hiss = eq(hiss, [('peak', 2600.0, 0.8, 3.0), ('highshelf', 6000.0, 0.7, -4.0)]) * flicker ** 1.5
     puffs = np.clip(smooth_noise(n, 13.0, rng) + 0.3, 0, None)
     flut = hp(lp(rng.standard_normal(n), 170.0 * size, 2), 30.0, 2) * (0.3 + puffs) * flicker
     body = bp(rng.standard_normal(n), 140.0, 900.0, 2) * flicker
-    y = 0.35 * hiss + 1.6 * flut + 0.35 * body
+    y = 0.45 * hiss + 1.0 * flut + 0.35 * body
     # crackles
     cr = np.zeros(n)
     dur = n / SR

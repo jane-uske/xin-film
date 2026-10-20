@@ -249,25 +249,25 @@ export default async function create(ctx) {
     const d = Math.max(0, T - cue.dc) * 700;
     return { p: [L.rack0[0] - 5200 + d, 2300 + 250 * Math.max(0, T - cue.dc), HZ - 1700], l: [L.rack0[0] + 16000 + d, -1900, HZ + 2300] };
   }
-  const T_CR = cue.dc + 0.7;
+  const T_CR = cue.dc + 0.6;
   const H0 = hallMM(T_CR);
   const CR = [
     H0.p,
-    [BCX - 30000, L.FLOOR + 45000, L.BLD.z1 + 40000],
+    [H0.p[0] + 6000, L.FLOOR + 48000, H0.p[2] - 4000],
     [BCX - 6000, L.FLOOR + 50000, L.BLD.z1 + 125000],
     [BCX - 2000, L.FLOOR + 40000, L.BLD.z1 + 185000],
     [BCX + 4000, L.FLOOR + 44000, L.BLD.z1 + 205000],
   ];
   const CRL = [
     H0.l,
-    [BCX - 6000, L.FLOOR, BCZ],
+    [BCX - 4000, L.FLOOR, BCZ + 6000],
     [BCX + 8000, L.FLOOR + 6000, BCZ],
     [BCX - 8000, L.FLOOR + 40000, BCZ],
     [BCX - 24000, L.FLOOR + 92000, BCZ - 20000],
   ];
   function craneMM(T) {
     const u = invLerp(T_CR, cue.fade + 1, T);
-    const k = 1 - Math.pow(1 - ease.inOutSine(u), 1.7);
+    const k = 1 - Math.pow(1 - u, 3);
     return { p: catmull(CR, k), l: catmull(CRL, k) };
   }
   function dcCamLocal(T) {
@@ -277,7 +277,7 @@ export default async function create(ctx) {
     let p = lerp3(a.p, h.p, wH), l = lerp3(a.l, h.l, wH);
     if (T > T_CR) {
       const c = craneMM(T);
-      const wC = ease.inOutSine(invLerp(T_CR, T_CR + 2.6, T));
+      const wC = ease.inOutSine(invLerp(T_CR, T_CR + 1.8, T));
       p = lerp3(p, c.p, wC); l = lerp3(l, c.l, wC);
     }
     const D = Math.min(len3(sub3(p, l)), Math.max(200, p[1] - L.FLOOR)) * MM;
@@ -507,7 +507,7 @@ export default async function create(ctx) {
     netHeatU.uGain.value = 0.045 * (1 - smoothstep(T_PO + 1.2, T_PO + 2.4, T));
     netHeat.visible = netHeatU.uGain.value > 0.001;
     dc.plU.uI.value = smoothstep(cue.dc - 1, cue.dc + 2, T);
-    dc.U.uFog.value = lerp(1 / (22000 * MM), 1 / (900000 * MM), smoothstep(cue.dc + 1.0, cue.dc + 3.5, T)) * smoothstep(T_PO + 0.8, T_PO + 1.6, T);
+    dc.U.uFog.value = lerp(1 / (22000 * MM), 1 / (900000 * MM), smoothstep(cue.dc + 0.7, cue.dc + 1.9, T)) * smoothstep(T_PO + 0.8, T_PO + 1.6, T);
   }
 
   // ------------------------------------------------------------------ main
@@ -547,6 +547,9 @@ export default async function create(ctx) {
     },
     overlay(g, f) {
       const T = f.T, S = f.S;
+      // Work-around (still needed with the engine's per-frame canvas reset): when a frame draws nothing,
+      // Chromium can keep uploading the previous overlay snapshot. One near-invisible pixel forces a fresh one.
+      g.save(); g.fillStyle = 'rgba(0,0,0,0.004)'; g.fillRect(0, 0, 1, 1); g.restore();
       const proj = (v) => ctx.project(new THREE.Vector3(v[0], v[1], v[2]), cam);
       const camR = new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld, 0);
       const camU = new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld, 1);

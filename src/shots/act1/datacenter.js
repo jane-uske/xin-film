@@ -25,7 +25,7 @@ export function buildDatacenter(ctx) {
   const FLOOR = -RH - 2;
 
   // shared: heat fog by view distance (warm air hanging in the hall)
-  const U = { uT: { value: 0 }, uLoad: { value: 1 }, uFog: { value: 0 }, uFogH: { value: 0.13 } };
+  const U = { uT: { value: 0 }, uLoad: { value: 1 }, uFog: { value: 0 }, uFogH: { value: 0.075 } };
   const FOG_VS = /* glsl */ `varying float vDist;`;
   const FOG_FS = /* glsl */ `uniform float uFog, uFogH; varying float vDist;
     float fogged(float h){ return mix(h, uFogH, 1.0 - exp(-vDist * uFog)); }`;
@@ -62,14 +62,14 @@ export function buildDatacenter(ctx) {
             die = max(die, box(mm, cm, vec2(13.0, 13.0)));
             hbm = max(hbm, box(mm, cm + vec2(-26.0, 0.0), vec2(6.0, 24.0)) + box(mm, cm + vec2(26.0, 0.0), vec2(6.0, 24.0)));
             vrm = max(vrm, box(mm, cm + vec2(0.0, 58.0), vec2(40.0, 6.0)));
-            glow += exp(-dot(d, d) / 3000.0);
+            glow += exp(-dot(d, d) / 1700.0);
           }
           float comp = step(0.84, hash21(floor(mm / 9.0) + vR.x * 31.0));
           float psu = box(p, vec2(0.5, 0.93), vec2(0.42, 0.035));
           float fans = box(p, vec2(0.5, 0.07), vec2(0.46, 0.045));
           float fine = pk * 0.18 + hbm * 0.3 * load + die * 0.42 * load + vrm * 0.3 * load + comp * 0.05 + psu * 0.55 - fans * 0.04;
           float k = aa(uv, 60.0);
-          h = 0.035 + glow * 0.5 * load + mix(0.08 + 0.04 * load, fine * 1.3, k);
+          h = 0.03 + glow * mix(0.78, 0.22, k) * load + mix(0.035 + 0.03 * load, fine * 1.15, k);
         } else if (abs(n.z) > 0.5){
           // 21 x 2U server units
           float Uf = uv.y * 21.0;
@@ -186,8 +186,8 @@ export function buildDatacenter(ctx) {
       void main(){
         float y = vP.y / ${(RH + 1400).toFixed(1)} + 0.5;           // 0 at floor, 1 at the top of the volume
         float n = snoise(vec3(vP.x * 0.0006, vP.y * 0.001 - uT * 0.5, vP.z * 0.002));
-        float h = 0.14 * (1.0 - smoothstep(0.55, 1.0, y)) * (0.75 + 0.35 * n);
-        gl_FragColor = vec4(h * exp(-vDist * uFog * 0.5), 0.0, 0.0, 1.0);
+        float h = 0.16 * (1.0 - smoothstep(0.55, 1.0, y)) * (0.75 + 0.35 * n);
+        gl_FragColor = vec4(h * exp(-vDist * uFog * 2.2), 0.0, 0.0, 1.0);
       }`,
     blending: THREE.AdditiveBlending, depthWrite: false, depthTest: true, transparent: true,
   });
@@ -317,7 +317,7 @@ export function buildDatacenter(ctx) {
         vec4 mv = modelViewMatrix * vec4(c, 1.0);
         mv.xy += position.xy * size * ${MM.toFixed(6)};
         vQ = position.xy * 2.0; vP = aP;
-        vA = smoothstep(0.0, 0.04, life) * (1.0 - smoothstep(0.5, 1.0, life)) * 0.3 * pow(1.0 - life, 2.2);
+        vA = smoothstep(0.0, 0.04, life) * (1.0 - smoothstep(0.5, 1.0, life)) * 0.62 * pow(1.0 - life, 2.6);
         gl_Position = projectionMatrix * mv;
       }`,
     fragmentShader: /* glsl */ `
@@ -327,7 +327,7 @@ export function buildDatacenter(ctx) {
         float r = length(vQ);
         if (r > 1.0) discard;
         float n = snoise(vec3(vQ * 2.1 + vP.yz * 10.0, uT * 0.18 + vP.w * 4.0));
-        float core = exp(-r * r * 4.0) * smoothstep(1.0, 0.6, r);
+        float core = exp(-r * r * 5.0) * smoothstep(1.0, 0.6, r);
         float d = core * clamp(0.5 + 0.7 * n, 0.0, 1.0);
         gl_FragColor = vec4(0.0, d * vA * uI, 0.0, 1.0);
       }`,

@@ -60,7 +60,7 @@ vec3 waxLight(vec3 P, vec3 N, vec3 V){
   float side = 1.0 - smoothstep(0.25, 0.9, zn);
   float rim = pow(1.0 - abs(dot(N, V)), 2.0);
   // 杯沿最薄：透光最强；向下指数衰减，颜色由黄白变为橙红
-  vec3 trans = exp(-depthTop * vec3(0.95, 1.55, 2.6));
+  vec3 trans = exp(-depthTop * vec3(1.55, 2.35, 3.5));
   float thin = 0.45 + 0.55 * exp(-wall * 0.8);
   vec3 col = trans * sss * thin * (0.75 + 0.6 * rim) * vec3(1.0, 0.56, 0.26) * 0.66;
   // 杯沿唇口：一圈亮边

@@ -258,7 +258,7 @@ def build(tl):
     prng = rng_for('heropan')
     for k, t in enumerate(ign[1:]):
         f = hz(pool[k % len(pool)])
-        mx.add('music', t, X.star_ping(f, f'hero{k}'), -30.0 - 0.15 * k, prng.uniform(-0.7, 0.7),
+        mx.add('music', t, X.star_ping(f, f'hero{k}'), -28.0 - 0.15 * k, prng.uniform(-0.7, 0.7),
                {'space': 0.4})
     # granular shimmer: accelerating with the stars, then a living star field
     a0, a1 = C['stars_accel_start'], C['stars_accel_end']
@@ -271,13 +271,13 @@ def build(tl):
             return 3.0 * (40.0 / 3.0) ** ((t - a0) / (a1 - a0))
         return max(2.0, 40.0 * np.exp(-(t - a1) / 1.2))
 
-    grain_cloud(mx, 'music', a0 - 0.6, LAND + 0.5, srate, spool, 'stars', (0.02, 0.09), (-54, -46), 0.9,
+    grain_cloud(mx, 'music', a0 - 0.6, LAND + 0.5, srate, spool, 'stars', (0.02, 0.09), (-49, -41), 0.9,
                 {'space': 0.75}, amp_fn=lambda t: 1.0 if t < LAND - 2 else max(0.0, (LAND + 0.5 - t) / 2.5))
     # constellation strokes: one soft tick each
     tpool = ['A7', 'E7', 'D7', 'A7', 'B7', 'E7', 'D8', 'A7', 'E7', 'G7', 'A7', 'D8', 'E7', 'A7']
     for k, t in enumerate(ticks):
         p = -0.55 + 1.1 * k / max(1, len(ticks) - 1)
-        mx.add('sfx', t, X.tick(f'astra{k}', hz(tpool[k % len(tpool)])), -31.0, p, {'space': 0.3})
+        mx.add('sfx', t, X.tick(f'astra{k}', hz(tpool[k % len(tpool)])), -25.0, p, {'space': 0.3})
     # soft open-fifth glass pad under the wordmark
     ta = C['astra_lines_start'] - 0.2
     n = ns(LAND - ta)

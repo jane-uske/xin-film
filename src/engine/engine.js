@@ -126,12 +126,13 @@ export class Engine {
       grade = gg;
     }
     // 叠加层
-    // 重设画布尺寸会无条件清空位图：只 clearRect 而本帧不画任何东西时，
-    // Chromium 可能沿用上一帧的内容上传，破坏帧的独立性
-    this.ovCanvas.width = this.W;
+    // 本帧若不画任何东西，Chromium 可能沿用上一帧的叠加层内容上传，破坏帧的独立性；
+    // 每帧在角落画一个几乎不可见的像素，强制本帧的内容真正提交
     const g = this.og;
     g.setTransform(1, 0, 0, 1, 0, 0);
     g.clearRect(0, 0, this.W, this.H);
+    g.fillStyle = 'rgba(0,0,0,0.004)';
+    g.fillRect(0, 0, 1, 1);
     if (side && side.inst.overlay) { g.save(); g.globalAlpha = 1 - k; side.inst.overlay(g, side.f); g.restore(); }
     if (main.inst.overlay) { g.save(); if (side) g.globalAlpha = k; main.inst.overlay(g, main.f); g.restore(); }
     for (const card of this.timeline.cards) {
