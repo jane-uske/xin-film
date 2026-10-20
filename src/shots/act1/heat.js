@@ -614,19 +614,18 @@ export default async function create(ctx) {
       const proj = (v) => ctx.project(new THREE.Vector3(v[0], v[1], v[2]), cam);
       const camR = new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld, 0);
       const camU = new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld, 1);
-      const F = LABELS.fields;
       // the classification table, 1/3: the sun
       if (T > cue.hud1 && T < cue.pull + 0.2) {
         const a = 1 - smoothstep(cue.pull - 0.9, cue.pull - 0.15, T);
         const w = camR.clone().multiplyScalar(-0.66 * SUN_R).add(camU.clone().multiplyScalar(0.34 * SUN_R));
         const [x, y] = proj([w.x, w.y, w.z]);
-        overlay.hudClassify(g, { ...LABELS.sun, fields: F, anchor: [x, y], dir: [-1, -0.55], len: 150, t: T - cue.hud1, alpha: a, S, charRate: 55 });
+        overlay.hudClassify(g, { ...LABELS.sun, anchor: [x, y], dir: [-1, -0.55], len: 150, t: T - cue.hud1, alpha: a, S, charRate: 55 });
       }
       // 2/3: the human brain (held into the snap so it can be read)
       if (T > cue.brainHud && T < cue.snap + 0.8) {
         const a = 1 - smoothstep(cue.snap + 0.25, cue.snap + 0.7, T);
         const [x, y] = proj(toW([0.66, 0.98, 0.18]));
-        overlay.hudClassify(g, { ...LABELS.brain, fields: F, anchor: [x, y], dir: [1, -0.5], len: 110, t: T - cue.brainHud, alpha: a, S, charRate: 120 });
+        overlay.hudClassify(g, { ...LABELS.brain, anchor: [x, y], dir: [1, -0.5], len: 110, t: T - cue.brainHud, alpha: a, S, charRate: 120 });
       }
       // the chip — the same AI chip becomes the wick of the digital flame in Act II
       if (T > cue.gpuHud && T < cue.dcHud) {
@@ -646,7 +645,7 @@ export default async function create(ctx) {
       if (T > cue.dcHud && T < cue.fade + 0.1) {
         const a = 1 - smoothstep(cue.fade - 0.5, cue.fade, T);
         const [x, y] = proj(toW(mmToL([BCX - 14000, L.FLOOR + 7000, BCZ])));
-        overlay.hudClassify(g, { ...LABELS.datacenter, fields: F, anchor: [x, y], dir: [-1, -0.6], len: 130, t: T - cue.dcHud, alpha: a, S, charRate: 90 });
+        overlay.hudClassify(g, { ...LABELS.datacenter, anchor: [x, y], dir: [-1, -0.6], len: 130, t: T - cue.dcHud, alpha: a, S, charRate: 90 });
       }
     },
   };

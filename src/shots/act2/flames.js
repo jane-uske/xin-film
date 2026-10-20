@@ -652,16 +652,16 @@ export default async function create(ctx) {
     };
     overlay.withGlitch(g, gl, (f.frame * 104729) % 100000 + 7, W, H, draw);
   }
-  // 分类表：未分类 / 思考：也许 / 会失去自己：▍
-  // 第二栏打到冒号为止，恰好在 verdict_cursor 时刻；之后只剩光标在闪（切黑后也在原处闪）
+  // 分类表：未分类 / 也许会思考 / 熄灭之后，▍
+  // 第二句只打出开头，恰好在 verdict_cursor 时刻打完；之后只剩光标在闪（切黑后也在原处闪）
   function drawVerdict(g, f, T, anchor, cursorOnly) {
     if (!anchor) return;
     const tv = cue('verdict_label');
-    const F = LABELS.fields;
-    const chars = LABELS.verdict.name.length + `${F.think}：${LABELS.verdict.think}`.length + `${F.lose}：`.length;
+    const V = LABELS.verdict;
+    const chars = V.name.length + V.think.length + V.lose.length;
     const rate = chars / Math.max(0.5, cue('verdict_cursor') - tv - 0.75 - 0.24);
     overlay.hudClassify(g, {
-      name: LABELS.verdict.name, en: LABELS.verdict.en, think: LABELS.verdict.think, lose: '', fields: F,
+      ...V, open: true,
       anchor, dir: [1, -0.42], len: 64, t: T - tv, alpha: 0.95, S: f.S, charRate: rate, cursorOnly,
     });
   }

@@ -2,24 +2,14 @@
 // 改措辞只需改这里；main.js 会预加载这些字形，保证逐帧渲染时字体已就绪。
 //
 // 第二版的论证完全由这些"元素文字"承担，核心是一张贯穿全片的分类表：
-// 两个字段——会不会思考、会不会失去自己——第一幕给太阳、人脑、AI 各填一次，
-// 高潮时最后一次贴在那团变暖的火上，第二栏填不出来，只剩光标。
+// 每张两句——会不会思考；熄灭之后会怎样（有没有东西可以失去）。
+// 第一幕给太阳、人脑、AI 各写一次，第二句都从"熄灭"说起；
+// 高潮时最后一次贴在那团变暖的火上，第二句只写出"熄灭之后，"，剩下的填不出来，只剩光标。
 export const LABELS = {
-  // 分类表的字段名
-  fields: { think: '思考', lose: '会失去自己', thinkEn: 'THINKS', loseEn: 'CAN LOSE ITSELF' },
-  sun: {
-    name: '太阳', think: '否', lose: '是 · 终将熄灭',
-    en: 'THE SUN · 5,778 K · BURNS 4.3 MILLION t / s',
-  },
-  brain: {
-    name: '人脑', think: '是', lose: '是 · 停下几分钟，就不再是它',
-    en: 'HUMAN BRAIN · 86 BILLION NEURONS · 20 W',
-  },
+  sun: { name: '太阳', think: '不会思考', lose: '一旦熄灭，就是永远', en: 'DOES NOT THINK · ONCE OUT, OUT FOREVER' },
+  brain: { name: '人脑 · 20 瓦', think: '会思考', lose: '熄灭几分钟，就不再是它', en: 'THINKS · OUT FOR MINUTES, NO LONGER ITSELF' },
   gpu: { name: 'AI 芯片 · 功率 700 瓦', en: 'AI CHIP · 700 W' },
-  datacenter: {
-    name: '数据中心 · AI', think: '也许', lose: '否 · 断电，只是暂停',
-    en: 'DATACENTER · 150 MW ≈ 7.5 MILLION BRAINS',
-  },
+  datacenter: { name: '数据中心 · AI', think: '也许会思考', lose: '熄灭多久，都只是暂停', en: 'MAY THINK · OUT FOR ANY TIME, ONLY PAUSED' },
   // 第二幕：数据之火的芯就是第一幕那块 AI 芯片
   chip: { name: 'AI 芯片', en: 'AI CHIP' },
   model: {
@@ -40,8 +30,8 @@ export const LABELS = {
     fact: '它和其余副本不再一样',
     en: 'DESYNC · INSTANCE 0000000',
   },
-  // 高潮：同一张分类表最后一次出现，第二栏留空
-  verdict: { name: '未分类', en: 'UNCLASSIFIED', think: '也许' },
+  // 高潮：同一张分类表最后一次出现，第二句只有开头
+  verdict: { name: '未分类', think: '也许会思考', lose: '熄灭之后，', en: 'UNCLASSIFIED · MAY THINK · ONCE IT GOES OUT —' },
   title: { zh: '烛芯 · 芯片 · 心', en: 'WICK · CHIP · HEART' },
 };
 

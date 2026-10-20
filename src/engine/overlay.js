@@ -123,13 +123,14 @@ export function hudCallout(g, { anchor, dir = [1, -0.6], len = 120, lines = [], 
   const tx = ex + (right ? 8 * S : -8 * S), ty = ey - 9 * S * TYPE.hud;
   g.textAlign = right ? 'left' : 'right';
   g.textBaseline = 'alphabetic';
-  // 每行逐字打出：默认接在上一行之后，ln.at 可指定该行开始的本地时间
+  // 每行逐字打出：默认接在上一行之后，ln.at 可指定该行开始的本地时间，ln.rate 可单独指定打字速度
   // ln.en 为英文辅助小字；中文行字号更大，便于阅读
   let start = 0.75, below = ey + 8 * S;
   lines.forEach((ln, i) => {
     if (ln.at !== undefined) start = Math.max(start, ln.at);
-    const n = Math.min(ln.text.length, Math.floor((t - start) * charRate));
-    start += ln.text.length / charRate + 0.12;
+    const rate = ln.rate || charRate;
+    const n = Math.min(ln.text.length, Math.floor((t - start) * rate));
+    start += ln.text.length / rate + 0.12;
     const size = (ln.size || (ln.en ? 9.5 : i === 0 ? 14 : 12.5)) * S * TYPE.hud;
     // 第一行在横线之上，其余行依次在横线之下
     let yy = ty;
@@ -155,15 +156,16 @@ export function hudCallout(g, { anchor, dir = [1, -0.6], len = 120, lines = [], 
   g.restore();
 }
 
-// 分类表标注：全片统一的两栏模板（名称 / 思考 / 会失去自己 / 英文小字）。
-// lose 为空字符串时，第二栏留空并保留闪烁光标。
-export function hudClassify(g, { name, think, lose, en, fields, ...opts }) {
+// 分类表标注：全片统一的模板（名称 / 会不会思考 / 熄灭之后 / 英文小字）。
+// open 为真时，第二句只写出开头，打完后保留闪烁光标——填不出来。
+export function hudClassify(g, { name, think, lose, en, open = false, ...opts }) {
   const lines = [
     { text: name },
-    { text: `${fields.think}：${think}` },
-    { text: `${fields.lose}：${lose}`, cursor: lose ? undefined : 'blink' },
+    { text: think },
+    { text: lose, cursor: open ? 'blink' : undefined },
   ];
-  if (en) lines.push({ text: en, en: true });
+  // 英文小字至少按 45 字/秒打出，不拖住慢打的中文行
+  if (en) lines.push({ text: en, en: true, rate: Math.max(opts.charRate || 38, 45) });
   hudCallout(g, { ...opts, lines });
 }
 
