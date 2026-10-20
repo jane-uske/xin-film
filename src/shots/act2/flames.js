@@ -147,15 +147,15 @@ export default async function create(ctx) {
       const ta = cue('lattice_fade'), tb = cue('candle_reenter'), tc = cue('lean_start') + 0.5, te = cue('cut_black');
       const g = rowGlide(ta);
       const gpos = g.pos;
-      const fin = { tg: V3(DIG.X / 2 + 0.2, lerp(st.wickY, DIG.wickY, 0.5) + 1.7, 0), dist: 25, az: 0.02, el: 4.5 * D2R };
+      const fin = { tg: V3(DIG.X / 2 + 0.2, lerp(st.wickY, DIG.wickY, 0.5) + 1.0, 0), dist: 26, az: 0.02, el: 11 * D2R };
       const posF = orbit(fin.tg, fin.dist, fin.az, fin.el);
       if (T < tc) {
         const u = ease.inOutSine(invLerp(ta, tc, T));
         P = { pos: gpos.clone().lerp(posF, u), tg: g.tg.clone().lerp(fin.tg, ease.inOutSine(invLerp(ta - 0.5, tc, T))), hand: 1 };
       } else {
         const u = ease.inOutSine(invLerp(tc, te + 1.5, T));
-        const tg = fin.tg.clone().lerp(V3(DIG.X / 2, lerp(st.wickY, DIG.wickY, 0.5) + 2.3, 0), u);
-        P = { tg, dist: lerp(25, 21.0, u), az: 0.02, el: lerp(4.5, 3.0, u) * D2R, hand: 1 };
+        const tg = fin.tg.clone().lerp(V3(DIG.X / 2, lerp(st.wickY, DIG.wickY, 0.5) + 2.0, 0), u);
+        P = { tg, dist: lerp(26, 20.5, u), az: 0.02, el: lerp(11, 7, u) * D2R, hand: 1 };
       }
     }
     if (!P.pos) P.pos = orbit(P.tg, P.dist, P.az, P.el);
@@ -193,8 +193,8 @@ export default async function create(ctx) {
   function rowGlide(T) {
     const a = cue('ch3_in') - 0.5, b = cue('lattice_fade') + 2.0;
     const u = (T - a) / (b - a);
-    const pos = V3(lerp(21.5, 16.5, u), 10.5, 10.5);
-    const yaw = -27 * D2R;
+    const pos = V3(lerp(13.6, 10.6, u), 10.6, 9.6);
+    const yaw = -12 * D2R;
     const tg = pos.clone().add(V3(Math.sin(yaw) * 40, 0.0, -Math.cos(yaw) * 40));
     return { pos, tg, hand: smoothstep(cue('warm_shift_start'), cue('warm_shift_end'), T) * 0.9 };
   }
@@ -295,7 +295,7 @@ export default async function create(ctx) {
     let flash = 0;
     for (const s of resSteps) if (T >= s) flash = Math.max(flash, 2.5 * Math.exp(-(T - s) / 0.06));
     o.uFlash.value = flash;
-    o.uFade.value = appear * (1 - 0.9 * soft);
+    o.uFade.value = appear * (1 - soft);
     // 种子穿过：光点让开
     if (p0) o.uSeed.value.set(p0[0], p0[1] + 0.15, p0[2], 0.42 * smoothstep(1.9, 0.6, Math.hypot(p0[0] - DIG.X, p0[1] - DIG.wickY - 1.4))); else o.uSeed.value.set(0, -100, 0, 0);
     // 连续的暖火（柔化之后接管）
@@ -338,11 +338,15 @@ export default async function create(ctx) {
     lattice.update({ n, since, fl: flL, gainA: 0.7 / (0.98 * LV[4].size * LV[4].size / 4), px, fade, latI: 0.6 * flL.f1[3] });
     if (!lattice.group.visible) shared.uLatI.value = 0;
     // 雾：只在火海里
-    shared.uFogK.value = inMach && T < cue('cut_black') ? 1 / 1100 : 0;
+    shared.uFogK.value = inMach && T < cue('cut_black') ? (T < cue('ch3_in') - 0.5 ? 1 / 1100 : 1 / 500) : 0;
     shared.uFogCol.value.set(0.0, 0.0, 0.0);
 
     // 地面：S11–S12 的微距镜头里看不到地面，省掉它
     floor.mesh.visible = T >= cue('track_right') - 0.5;
+    // 第三幕末：两团火的光在地面上相遇（地面响应加强）
+    const fl17 = smoothstep(cue('candle_reenter'), cue('lean_start') + 3, T);
+    floor.u.uDim.value = 1 + 35 * fl17;
+    floor.u.uOpen.value = 0.85 * fl17;
 
     // ---- 粒子 ----
     parts.begin();
@@ -373,7 +377,8 @@ export default async function create(ctx) {
     ctx.renderer.render(scene, camera);
 
     // ---- HUD 数据 ----
-    hud = { T, Tm, n, powerOff, origScreen: ctx.project(V3(DIG.X, DIG.wickY + 1.6, 0), camera), lvl };
+    hud = { T, Tm, n, powerOff, origScreen: ctx.project(V3(DIG.X, DIG.wickY + 1.6, 0), camera), lvl,
+      origTop: ctx.project(V3(DIG.X, DIG.wickY + 3.15, 0), camera), origBot: ctx.project(V3(DIG.X, DIG.wickY - 0.15, 0), camera) };
 
     // ---- 调色 ----
     return grade(T, powerOff, st);
@@ -407,8 +412,8 @@ export default async function create(ctx) {
         const end = i / (N - 1);
         const br = (0.35 + 1.4 * Math.pow(end, 3)) * (0.8 + 0.2 * Math.sin(T * 17 + side * 5)) * smoothstep(0, 0.08, u);
         const col = side === 0 ? [1.0, 0.55, 0.2] : [1.0, 0.62, 0.3];
-        parts.point(x, y + wob, z, col[0] * br * 0.5, col[1] * br * 0.5, col[2] * br * 0.5, 2.6 + 2.0 * Math.pow(end, 4));
-        if (i % 6 === 0) parts.point(x, y + wob, z, col[0] * br * 0.12, col[1] * br * 0.1, col[2] * br * 0.08, 16);
+        parts.point(x, y + wob, z, col[0] * br * 1.1, col[1] * br * 1.1, col[2] * br * 1.1, 2.4 + 2.4 * Math.pow(end, 4));
+        if (i % 4 === 0) parts.point(x, y + wob, z, col[0] * br * 0.16, col[1] * br * 0.12, col[2] * br * 0.08, 18);
       }
     }
   }
@@ -492,7 +497,7 @@ export default async function create(ctx) {
     return clamp(0.25 + t * 0.9 + 0.3 * Math.sin(t * 40) * Math.sin(t * 13));
   }
   function drawDesync(g, f) {
-    const { T, origScreen } = hud;
+    const { T, origTop, origBot } = hud;
     const S = f.S, W = ctx.W, H = ctx.H;
     const t0 = cue('desync_start') + 0.35, tg = cue('hud_glitch');
     if (T < t0 || T > tg + 1.6) return;
@@ -500,13 +505,14 @@ export default async function create(ctx) {
     const dissolve = 1 - smoothstep(tg + 0.6, tg + 1.5, T);
     if (dissolve <= 0) return;
     const delta = 0.003 * Math.exp((T - cue('desync_start')) * 1.25);
-    const [x, y] = origScreen;
+    const x = (origTop[0] + origBot[0]) / 2, y0 = (origTop[1] + origBot[1]) / 2 + 20 * S;
+    const bh = Math.min(Math.abs(origBot[1] - origTop[1]) * 1.06, H - 60 * S), bw = bh * 0.42;
+    const y = y0;
     const draw = (gg) => {
-      const bw = 150 * S, bh = 250 * S;
       overlay.hudBracket(gg, { x, y: y - 20 * S, w: bw, h: bh, t: T - t0, alpha: dissolve, S, color: overlay.COLORS.hudWarn, corner: 16 });
       if (T - t0 > 0.35) {
-        overlay.hudText(gg, `DESYNC ${delta.toFixed(3)} s`, x + bw / 2 + 12 * S, y - 20 * S - bh / 2 + 12 * S, { size: 11, alpha: 0.9 * dissolve, S, color: overlay.COLORS.hudWarn });
-        overlay.hudText(gg, 'INSTANCE 0000000', x + bw / 2 + 12 * S, y - 20 * S - bh / 2 + 30 * S, { size: 9.5, alpha: 0.55 * dissolve, S, color: overlay.COLORS.hudWarn });
+        overlay.hudText(gg, `DESYNC ${delta.toFixed(3)} s`, x + bw / 2 + 12 * S, Math.max(y - 20 * S - bh / 2, 30 * S) + 12 * S, { size: 11, alpha: 0.9 * dissolve, S, color: overlay.COLORS.hudWarn });
+        overlay.hudText(gg, 'INSTANCE 0000000', x + bw / 2 + 12 * S, Math.max(y - 20 * S - bh / 2, 30 * S) + 30 * S, { size: 9.5, alpha: 0.55 * dissolve, S, color: overlay.COLORS.hudWarn });
       }
     };
     overlay.withGlitch(g, gl, (f.frame * 104729) % 100000 + 7, W, H, draw);

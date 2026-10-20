@@ -126,6 +126,9 @@ export class Engine {
       grade = gg;
     }
     // 叠加层
+    // 重设画布尺寸会无条件清空位图：只 clearRect 而本帧不画任何东西时，
+    // Chromium 可能沿用上一帧的内容上传，破坏帧的独立性
+    this.ovCanvas.width = this.W;
     const g = this.og;
     g.setTransform(1, 0, 0, 1, 0, 0);
     g.clearRect(0, 0, this.W, this.H);

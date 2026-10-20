@@ -19,7 +19,7 @@ export function makeFloor(ctx, shared) {
     uLat: shared.uLat,                // x: 原点 x, y: 间距, z: nx, w: nz
     uLatI: shared.uLatI, uLatCol: shared.uLatCol, uLatFlameY: shared.uLatFlameY,
     uFogK: shared.uFogK, uFogCol: shared.uFogCol,
-    uDim: { value: 1 }, uLatFill: shared.uLatFill,
+    uDim: { value: 1 }, uOpen: { value: 0 }, uLatFill: shared.uLatFill,
   };
   const mat = new THREE.ShaderMaterial({
     glslVersion: THREE.GLSL3, uniforms: u,
@@ -29,7 +29,7 @@ precision highp float;
 uniform vec3 uFlamePos; uniform float uFlameI; uniform vec3 uFlameCol;
 uniform vec3 uDigPos; uniform float uDigI; uniform vec3 uDigCol;
 uniform vec3 uMatchPos; uniform float uMatchI;
-uniform float uCandleR, uCandleH, uDim, uLatFill;
+uniform float uCandleR, uCandleH, uDim, uLatFill, uOpen;
 uniform vec2 uPlinth; uniform vec4 uLat; uniform float uLatI, uLatFlameY; uniform vec3 uLatCol;
 ${fogGLSL}
 in vec3 vW; out vec4 o;
@@ -63,13 +63,13 @@ void main(){
     // 用焰体上下两点近似一团有体积的光源，阴影边缘更软
     vec3 L1 = uFlamePos + vec3(0.0, -0.6, 0.0), L2 = uFlamePos + vec3(0.0, 1.0, 0.0);
     float s1 = occCyl(P, L1, vec2(0.0), uCandleR, uCandleH), s2 = occCyl(P, L2, vec2(0.0), uCandleR, uCandleH);
-    float sh = 0.22 + 0.78 * (0.5 * s1 + 0.5 * s2);
+    float sh = mix(0.22 + 0.78 * (0.5 * s1 + 0.5 * s2), 1.0, uOpen);
     col += lightAt(P, V, uFlamePos, uFlameCol, uFlameI) * sh;
   }
   if (uDigI > 0.0) {
     vec3 L1 = uDigPos + vec3(0.0, -0.5, 0.0), L2 = uDigPos + vec3(0.0, 1.2, 0.0);
     float s1 = occBox(P, L1, uDigPos.xz, uPlinth.x, uPlinth.y), s2 = occBox(P, L2, uDigPos.xz, uPlinth.x, uPlinth.y);
-    col += lightAt(P, V, uDigPos, uDigCol, uDigI) * (0.5 * s1 + 0.5 * s2);
+    col += lightAt(P, V, uDigPos, uDigCol, uDigI) * mix(0.5 * s1 + 0.5 * s2, 1.0, uOpen);
   }
   if (uMatchI > 0.0) col += lightAt(P, V, uMatchPos, vec3(1.0, 0.55, 0.22), uMatchI);
   // 火海：周围 3×3 个格子逐个算，远处换成平均照度（避免摩尔纹）

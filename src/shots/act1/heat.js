@@ -252,12 +252,12 @@ export default async function create(ctx) {
   const CRL = [
     [BCX, L.FLOOR, BCZ],
     [BCX + 8000, L.FLOOR + 6000, BCZ],
-    [BCX + 34000, L.FLOOR + 22000, BCZ],
-    [BCX + 48000, L.FLOOR + 80000, BCZ - 20000],
+    [BCX - 14000, L.FLOOR + 40000, BCZ],
+    [BCX - 34000, L.FLOOR + 92000, BCZ - 20000],
   ];
   function craneMM(T) {
     const u = invLerp(cue.dc, cue.fade + 1, T);
-    const k = ease.inOutSine(u);
+    const k = 1 - Math.pow(1 - ease.inOutSine(u), 1.7);
     return { p: catmull(CR, k), l: catmull(CRL, k) };
   }
   function dcCamLocal(T) {
@@ -504,6 +504,9 @@ export default async function create(ctx) {
     },
     overlay(g, f) {
       const T = f.T, S = f.S;
+      // Work-around: if a frame only clears the overlay canvas, Chromium can keep uploading the previous
+      // frame's snapshot (stale HUD). One near-invisible pixel per frame forces a fresh upload.
+      g.save(); g.fillStyle = 'rgba(0,0,0,0.004)'; g.fillRect(0, 0, 1, 1); g.restore();
       const proj = (v) => ctx.project(new THREE.Vector3(v[0], v[1], v[2]), cam);
       const camR = new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld, 0);
       const camU = new THREE.Vector3().setFromMatrixColumn(cam.matrixWorld, 1);

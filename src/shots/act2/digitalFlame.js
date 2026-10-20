@@ -239,8 +239,8 @@ void main(){
   // 发红：先是暗红的热，再是燃烧前沿的亮橙
   // 热：暗红的斑驳，裂纹处更亮
   float crack = 1.0 - smoothstep(0.0, 0.08, abs(snoise(vLocal * 22.0 + 3.0)));
-  vec3 hot = vec3(1.0, 0.16, 0.025) * uGlow * (0.08 + 0.35 * n * n + 0.9 * crack);
-  col += hot + vec3(1.0, 0.42, 0.08) * rim * 2.2;
+  vec3 hot = vec3(1.0, 0.14, 0.02) * uGlow * (0.02 + 0.12 * n * n + 0.45 * crack);
+  col += hot + vec3(1.0, 0.42, 0.08) * rim * 1.2;
   col *= uFade;
   o = vec4(col, 1.0);
 }`;

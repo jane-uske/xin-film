@@ -371,13 +371,13 @@ def build(tl):
     mx.automate(['sfx'], [(IMP + 0.34, 0), (IMP + 0.38, -60), (IGN - 0.002, -60), (IGN, 0)])
 
     # IGNITION: the one Hollywood moment
-    mx.add('sfx', IGN, X.sub_drop(7.5, 'ign'), -15.0)
-    mx.add('sfx', IGN, X.boom(1.6, 'ign'), -12.0, sends={'hall': 0.15})
+    mx.add('sfx', IGN, X.sub_drop(7.5, 'ign'), -19.0)
+    mx.add('sfx', IGN, X.boom(1.6, 'ign'), -15.0, sends={'hall': 0.15})
     mx.add('sfx', IGN, X.impact_burst(5.0, 'ign'), -12.0, sends={'space': 0.7, 'hall': 0.2})
     mx.add('sfx', IGN + 0.05, X.whoosh(2.4, 'shock', peak=0.22, f_lo=300, f_hi=6500, width_oct=1.3,
                                        pan_from=-0.9, pan_to=0.9, attack_pow=0.7), -12.0, sends={'space': 0.4})
     full = ['D2', 'A2', 'D3', 'F3', 'A3', 'E4', 'A4', 'D5', 'E5', 'A5']
-    sp = [(IGN, -110), (IGN + 0.06, 0), (IGN + 1.0, -5), (IGN + 2.5, -10), (IGN + 5.0, -9), (C['star_hud_2'] - 0.3, -10),
+    sp = [(IGN, -110), (IGN + 0.06, -2), (IGN + 1.0, -6), (IGN + 2.5, -10), (IGN + 5.0, -9), (C['star_hud_2'] - 0.3, -10),
           (C['star_hud_2'] + 1.5, -110)]
     chord(mx, full, IGN, C['star_hud_2'] + 1.5, gain=-3.0, env=sp, label='ign')
     n = ns(12.0)
@@ -519,7 +519,7 @@ def build(tl):
     # -------------------------------------------------------------------------
     log('act II')
     MS, FC = C['match_strike'], C['flame_catch']
-    mx.add('sfx', MS, X.match_strike('m1'), -9.0, sends={'room': 0.3, 'hall': 0.08})
+    mx.add('sfx', MS, X.match_strike('m1'), -12.0, sends={'room': 0.3, 'hall': 0.08})
     mx.add('sfx', FC, X.flame_catch('c1'), -20.0, sends={'room': 0.3})
     CB = C['cut_black']
     TR = C['track_right']
@@ -731,7 +731,7 @@ def build(tl):
         gap = 0.27 * hper(t)
         for j, (dt, s) in enumerate(((0.0, 1.0), (gap, 0.6))):
             if t + dt < CB:
-                mx.add('music', t + dt, X.heartbeat_hit(f'hb3{k}{j}', s), -19.0 + 7.0 * x, 0.0, {'hall': 0.04})
+                mx.add('music', t + dt, X.heartbeat_hit(f'hb3{k}{j}', s), -22.0 + 6.0 * x, 0.0, {'hall': 0.04})
     prog = [(CRE, ['D3', 'A3', 'F4']), (LS, ['Bb2', 'F3', 'A3', 'D4']), (LS + 3.0, ['C3', 'G3', 'E4', 'D5']),
             (LS + 5.0, ['Bb2', 'G3', 'D4', 'F4']), (BS, ['A2', 'E3', 'D4', 'G4', 'A4']),
             (BS + 1.5, ['A2', 'E3', 'C#4', 'G4', 'Bb4', 'E5'])]
@@ -757,7 +757,7 @@ def build(tl):
                 continue
             nt = chs[(k * 2 + j) % len(chs)]
             m = midi(nt) + (12 if (k + j) % 3 == 2 else 0) + (12 if midi(nt) < 50 else 0)
-            pno(mx, t + dt, m, 0.3 + 0.45 * x, ring=1.6, held=0.8, gain=-14.0 + 4 * x, p=-0.45, label='arp3')
+            pno(mx, t + dt, m, 0.3 + 0.45 * x, ring=1.6, held=0.8, gain=-16.0 + 4 * x, p=-0.45, label='arp3')
     mx.add('ambience', LS, X.wind_gust(3.8, 'lean', -0.5, 0.45), -27.0, sends={'hall': 0.3})
     rs = X.reverse_swell(CB - BS + 0.0, 'bridge', 1500.0, 14000.0, end_fade=0.002)
     mx.add('sfx', BS, rs, -24.0, sends={'hall': 0.1})
