@@ -226,3 +226,19 @@ def qa_zoom(x, tl, windows, path):
     plt.tight_layout()
     plt.savefig(path)
     plt.close(fig)
+
+
+def soft_clip_os(x, knee_db=-6.0, ceil=1.0, os=4):
+    """4x-oversampled soft-knee clipper: linear below the knee, tanh-rounded above it toward `ceil`.
+    Returns (y, fraction of samples above the knee)."""
+    k0 = 10 ** (knee_db / 20)
+    out = np.empty_like(x)
+    frac = 0.0
+    for ch in range(x.shape[0]):
+        u = signal.resample_poly(x[ch], os, 1)
+        a = np.abs(u)
+        m = a > k0
+        frac += m.mean() / x.shape[0]
+        u[m] = np.sign(u[m]) * (k0 + (ceil - k0) * np.tanh((a[m] - k0) / (ceil - k0)))
+        out[ch] = signal.resample_poly(u, 1, os)[: x.shape[1]]
+    return out, frac
