@@ -67,7 +67,7 @@ export function buildDatacenter(ctx) {
           float comp = step(0.84, hash21(floor(mm / 9.0) + vR.x * 31.0));
           float psu = box(p, vec2(0.5, 0.93), vec2(0.42, 0.035));
           float fans = box(p, vec2(0.5, 0.07), vec2(0.46, 0.045));
-          float fine = pk * 0.18 + hbm * 0.3 * load + die * 0.42 * load + vrm * 0.3 * load + comp * 0.05 + psu * 0.55 - fans * 0.04;
+          float fine = pk * 0.18 + hbm * 0.3 * load + die * 0.2 * load + vrm * 0.3 * load + comp * 0.05 + psu * 0.55 - fans * 0.04;
           float k = aa(uv, 60.0);
           h = 0.1 + glow * mix(0.8, 0.25, k) * load + mix(0.04 + 0.03 * load, fine * 1.15, k);
         } else if (abs(n.z) > 0.5){

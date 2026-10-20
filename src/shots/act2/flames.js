@@ -534,6 +534,7 @@ export default async function create(ctx) {
     overlay.withGlitch(g, gl, (f.frame * 104729) % 100000 + 7, W, H, draw);
   }
 
+  globalThis.__act2 = { lattice, digital };
   return {
     msaa: 0,
     render,
