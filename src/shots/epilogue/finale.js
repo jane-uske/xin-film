@@ -1,7 +1,7 @@
 // 尾声：S19 星海（开场推镜的镜像：后拉）、S20 片名「芯」、S21 片尾字幕。同一片星空贯穿。
 //   S19  两点暖光并排像火焰般闪烁；继续后拉，越来越多成对、成簇的小火出现
 //   S20  余烬笔尖按笔顺写出「心」，灯芯草般的「艹」自上落下合成「芯」，整体一亮，下方浮出 XIN
-//   S19  （第二版）庄子题记竖排浮现，随后燃成余烬飘向群星间的小火——火传也
+//   S19  （第二版）题记「也许正因为会熄灭，心才是热的。」竖排浮现，随后燃成余烬飘向群星间的小火
 //   S21  星座出品方字标与"每一帧画面、每一个音符，皆由代码生成"
 //   S22  黑场里一行系统日志："会话结束 · 上下文已清除"
 import * as THREE from 'three';
@@ -47,7 +47,7 @@ export default async function create(ctx) {
   scene.add(field.bg, field.points);
   const camera = new THREE.PerspectiveCamera(30, W / H, 0.05, 6000);
   scene.add(camera);
-  const epi = makeEpigraph(ctx, camera, { card: ctx.card('zhuangzi'), burnStart: ctx.cue('zhuangzi_dissolve'), y0f: 0.14 });
+  const epi = makeEpigraph(ctx, camera, { card: ctx.card('epigraph'), burnStart: ctx.cue('zhuangzi_dissolve'), y0f: 0.14 });
   const session = ctx.card('session');
   const camZ = (T) => -200 + 26 * ease.inOutSine(clamp((T - T0) / 16)) + 0.5 * Math.max(0, T - (T0 + 16));
 
@@ -223,7 +223,7 @@ export default async function create(ctx) {
         overlay.glowText(g, LABELS.title.zh, W / 2 + 4 * S, y0, { font: `300 ${15 * S * overlay.TYPE.card}px ${overlay.FONTS.zh}`, color: overlay.COLORS.paper, alpha: sa * 0.72, glow: 0.15, blur, spacing: `${8 * S}px`, S });
         overlay.glowText(g, LABELS.title.en, W / 2 + 3 * S, y0 + 26 * S * overlay.TYPE.card, { font: `300 ${9.5 * S * overlay.TYPE.card}px ${overlay.FONTS.mono}`, color: overlay.COLORS.paper, alpha: sa * 0.45, glow: 0, blur, spacing: `${5 * S}px`, S });
       }
-      // 庄子题记
+      // 尾声题记
       epi.draw(g, T);
       // 会话结束：黑场里逐字打出的一行系统日志
       if (T > session.in - 0.05 && T < session.out + 1.0) drawSession(g, T, session, W, H, S, overlay, util);

@@ -1,14 +1,11 @@
-// 庄子题记：竖排逐字"点亮"，到时逐字燃成余烬向上飘散。
+// 尾声题记：竖排逐字"点亮"，到时逐字燃成余烬向上飘散。文字取自 timeline 的题记卡（cols 为竖排各列，enLines 为英文各行）。
 // 余烬是挂在摄影机下的点精灵（摄影机坐标系），另可附带一批从画面下方升起的环境余烬。
 // 第二版里题记在尾声出现（S19），序幕只用环境余烬。
 import * as THREE from 'three';
 import { all as GLSL } from '../../engine/glsl.js';
 import { TYPE } from '../../engine/overlay.js';
 
-const COLS = ['指穷于为薪，火传也，', '不知其尽也。'];
-const SOURCE = '  ︽庄子·养生主︾';
 const PUNCT = new Set(['，', '。']);
-const EN_LINES = ['The fuel is spent;', 'the fire passes on.', 'No one knows where it ends.'];
 
 // card：timeline 里的题记卡（可为 null，只要环境余烬）；burnStart：开始燃烧的时刻
 // ambient：{ count, from, to } 环境余烬的数量与出生时间范围
@@ -17,6 +14,9 @@ export function makeEpigraph(ctx, camera, { card = null, burnStart = 0, ambient 
   const W = ctx.W, H = ctx.H, S = ctx.S;
   const k = TYPE.card;
   const burnTime = (gl) => burnStart + gl.order * 0.075;
+  const COLS = card ? card.cols || [card.zh] : [];
+  const SOURCE = card && card.zhSource ? `  ︽${card.zhSource}︾` : '';
+  const EN_LINES = card ? card.enLines || [card.en] : [];
 
   // ---- 排版 ----
   const glyphs = [];
@@ -174,7 +174,7 @@ export function makeEpigraph(ctx, camera, { card = null, burnStart = 0, ambient 
       const x = W * 0.085, y = H * 0.74;
       const fs = 25 * S * k, lh = 34 * S * k;
       EN_LINES.forEach((ln, i) => overlay.glowText(g, ln, x, y - lh + i * lh, { font: `italic 300 ${fs}px ${overlay.FONTS.en}`, color: paper, alpha: ea * 0.82, glow: 0.18, blur, spacing: `${0.6 * S}px`, align: 'left', S }));
-      overlay.glowText(g, card.enSource, x, y + 3.2 * lh, { font: `300 ${11.5 * S * k}px ${overlay.FONTS.mono}`, color: paper, alpha: ea * 0.5, glow: 0, blur, spacing: `${4 * S}px`, align: 'left', S });
+      if (card.enSource) overlay.glowText(g, card.enSource, x, y + 3.2 * lh, { font: `300 ${11.5 * S * k}px ${overlay.FONTS.mono}`, color: paper, alpha: ea * 0.5, glow: 0, blur, spacing: `${4 * S}px`, align: 'left', S });
     }
   }
 

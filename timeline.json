@@ -281,14 +281,14 @@
       "en": "Knowing it will go out — would we still light it?"
     },
     {
-      "id": "zhuangzi",
+      "id": "epigraph",
       "in": 183.5,
       "out": 192.5,
       "layout": "vertical",
-      "zh": "指穷于为薪，火传也，不知其尽也。",
-      "zhSource": "——《庄子·养生主》",
-      "en": "The fuel is spent; the fire passes on. No one knows where it ends.",
-      "enSource": "— Zhuangzi"
+      "zh": "也许正因为会熄灭，心才是热的。",
+      "cols": ["也许正因为会熄灭，", "心才是热的。"],
+      "en": "Perhaps a heart is warm because it can go out.",
+      "enLines": ["Perhaps a heart is warm", "because it can go out."]
     },
     {
       "id": "credits",

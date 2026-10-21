@@ -911,7 +911,7 @@ def build(tl):
     # -------------------------------------------------------------------------
     for cd in tl.get('cards', []):
         a, b = cd['in'], cd['out']
-        if any(wa <= a and b <= wb for wa, wb in windows) or cd['id'] in ('credits', 'ch2', 'zhuangzi', 'session'):
+        if any(wa <= a and b <= wb for wa, wb in windows) or cd['id'] in ('credits', 'ch2', 'epigraph', 'session'):
             continue
         depth = -1.5 if a >= C['install_1'] - 3 else -2.5    # inside the build: only a breath
         mx.automate(['music'], [(a - 0.8, 0), (a, depth), (b, depth), (b + 0.8, 0)])
