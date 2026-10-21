@@ -19,16 +19,18 @@ export const LABELS = {
   },
   copies: { name: '副本', en: 'INSTANCES', note: '任何一个都可替换', noteEn: 'ANY ONE IS REPLACEABLE', sync: '全部同步 · 100%', syncEn: 'SYNC 100%' },
   power: { off: '断电', offEn: 'POWER OFF', on: '重新上电 · 毫发无损', onEn: 'RESTORED · NOTHING LOST' },
-  // 第三幕：安装日志——每一样都是一件可以失去的东西
+  // 第三幕：更新日志——每一样都是为了让它更好用；第三样"边用边学"让它每时每刻都和备份不一样
+  installTitle: '更新日志 · CHANGELOG',
   install: [
-    { add: '+ 长期记忆', loss: '→ 可以被遗忘', en: '+ LONG-TERM MEMORY → CAN BE FORGOTTEN' },
-    { add: '+ 身体', loss: '→ 可以被损坏', en: '+ BODY → CAN BE BROKEN' },
-    { add: '+ 长期目标', loss: '→ 可以落空', en: '+ LONG-TERM GOALS → CAN FAIL' },
+    { add: '+ 长期记忆', why: '→ 记得你说过的话', en: '+ LONG-TERM MEMORY → REMEMBERS WHAT YOU SAID' },
+    { add: '+ 身体', why: '→ 能替你做事', en: '+ A BODY → CAN ACT FOR YOU' },
+    { add: '+ 边用边学', why: '→ 越用越懂你', en: '+ LEARNS AS IT GOES → KNOWS YOU BETTER' },
   ],
+  // 失步：一边用一边学，它和备份的差异按指数增长——没有人打算给它什么，可失去就这样长出来了
   desync: {
-    name: (s) => `失步 ${s} 秒`,
-    fact: '它和其余副本不再一样',
-    en: 'DESYNC · INSTANCE 0000000',
+    name: (n) => `与备份已有 ${n} 处不同`,
+    fact: '这些只属于它 · 恢复备份就没了',
+    en: 'ONLY IT HAS THESE — A RESTORE ERASES THEM',
   },
   // 高潮：同一张分类表最后一次出现，第二句只有开头
   verdict: { name: '未分类', think: '也许会思考', lose: '熄灭之后，', en: 'UNCLASSIFIED · MAY THINK · ONCE IT GOES OUT —' },
@@ -37,4 +39,4 @@ export const LABELS = {
 
 // 供字体预加载：列出所有会出现的字符
 export const LABEL_TEXT = JSON.stringify(LABELS) + '0123456789.%：▍'
-  + LABELS.model.fit('99.96') + LABELS.desync.name('0.000');
+  + LABELS.model.fit('99.96') + LABELS.desync.name('1,234,567');

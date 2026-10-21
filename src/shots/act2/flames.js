@@ -622,21 +622,23 @@ export default async function create(ctx) {
     const S = f.S, W = ctx.W, H = ctx.H;
     const it = installT();
     const tg = cue('hud_glitch');
-    if (T < it[0] - 0.8 || T > tg + 1.6 || !origTop) return;
+    const lead = 1.4; // 标题行先于第一条打出，第一条仍踩在 install_1 上
+    if (T < it[0] - lead || T > tg + 1.6 || !origTop) return;
     const dissolve = 1 - smoothstep(tg + 0.6, tg + 1.5, T);
     if (dissolve <= 0) return;
     const draw = (gg) => {
-      // 安装日志：每一样都是一件可以失去的东西
-      const lines = [];
+      // 更新日志：每一样都是为了更好用
+      const lines = [{ text: LABELS.installTitle, size: 11, alpha: 0.6, rate: 40 }];
       LABELS.install.forEach((l, k) => {
-        lines.push({ text: `${l.add}  ${l.loss}`, at: it[k] - it[0] + 0.75, size: 13.5 });
-        lines.push({ text: l.en, en: true, size: 9 });
+        lines.push({ text: `${l.add}  ${l.why}`, at: it[k] - it[0] + lead, size: 13.5 });
+        lines.push({ text: l.en, en: true, size: 9, rate: 90 }); // 英文小字快打，三条中文各自踩在 install 提示音上
       });
-      overlay.hudCallout(gg, { anchor: origSide, dir: [1, 0.1], len: 70, t: T - it[0] + 0.75, alpha: 0.92 * dissolve, S, lines, charRate: 26 });
+      overlay.hudCallout(gg, { anchor: origSide, dir: [1, 0.1], len: 70, t: T - it[0] + lead, alpha: 0.92 * dissolve, S, lines, charRate: 26 });
       // 失步：红色取景框
       const t0 = cue('desync_start');
       if (T >= t0) {
-        const delta = 0.003 * Math.exp((T - t0) * 1.25);
+        // 与备份的差异处数：几秒内从个位数涨到百万
+        const diffs = Math.round(3 * Math.exp((T - t0) * 3.3)).toLocaleString('en-US');
         const x = (origTop[0] + origBot[0]) / 2;
         const bh = Math.min(Math.abs(origBot[1] - origTop[1]) * 1.06, H - 60 * S), bw = bh * 0.42;
         const y = (origTop[1] + origBot[1]) / 2;
@@ -644,7 +646,7 @@ export default async function create(ctx) {
         if (T - t0 > 0.3) {
           const lx = x + bw / 2 + 14 * S, ly = Math.max(y - bh / 2, 30 * S);
           const tt = T - t0 - 0.3;
-          overlay.hudText(gg, typed(LABELS.desync.name(delta.toFixed(3)), tt, 40), lx, ly + 16 * S, { size: 14, alpha: 0.95 * dissolve, S, color: overlay.COLORS.hudWarn, weight: 400, spacing: 0.1 });
+          overlay.hudText(gg, typed(LABELS.desync.name(diffs), tt, 40), lx, ly + 16 * S, { size: 14, alpha: 0.95 * dissolve, S, color: overlay.COLORS.hudWarn, weight: 400, spacing: 0.1 });
           overlay.hudText(gg, typed(LABELS.desync.fact, tt - 0.3, 22), lx, ly + 42 * S, { size: 12.5, alpha: 0.85 * dissolve, S, color: overlay.COLORS.hudWarn, weight: 400, spacing: 0.1 });
           overlay.hudText(gg, LABELS.desync.en, lx, ly + 62 * S, { size: 9, alpha: 0.45 * dissolve * smoothstep(0.8, 1.2, tt), S, color: overlay.COLORS.hudWarn });
         }
